@@ -1,0 +1,66 @@
+# ============================================================
+# 大乐透数字冷热度工具 - 全局配置
+# 所有阈值、窗口、权重都在这里调，不用动代码
+# ============================================================
+
+# 玩法定义
+game:
+  name: "超级大乐透"
+  front_range: [1, 35]   # 前区号码范围
+  front_count: 5          # 前区选几个
+  back_range:  [1, 12]   # 后区号码范围
+  back_count:  2          # 后区选几个
+  draw_days:  [1, 3, 6]  # 每周一/三/六开奖（1=周一）
+
+# 数据源
+data_source:
+  primary: "500.com"      # 主数据源
+  fallback: ["sporttery.cn", "sina.com"]
+  csv_path: "data-raw/lottery_history.csv"
+  normalized_path: "data-normalized/lottery_history.parquet"
+
+# 算法窗口（最近 N 期计算热度）
+windows:
+  short:   30    # 短期热度
+  mid:     100   # 中期热度
+  long:    500   # 长期热度
+  full:    0     # 0 = 全部历史
+
+# EWMA 指数衰减（金融常用）
+ewma:
+  alpha: 0.15    # 衰减系数，越小越平滑
+
+# 贝叶斯先验（解决小样本噪声）
+bayesian:
+  prior_alpha: 5.0   # 先验命中次数
+  prior_beta:  20.0  # 先验未命中次数
+  # 含义：先验认为"过去每 25 期约出 5 次"
+  # 即 5 / (5+20) = 20% 命中率，对应前区理论期望
+
+# 综合评分权重（各算法在最终热度里的占比）
+# 必须 Σ = 1.0
+composite_weights:
+  frequency:        0.10
+  missing_inverse:  0.15
+  weighted_window:  0.20
+  ewma:             0.20
+  bayesian:         0.15
+  zscore:           0.20
+
+# 冷热分区阈值（基于综合评分百分位）
+thresholds:
+  hot:  0.75   # ≥ 此分为热号
+  warm: 0.45   # ≥ 此分为温号
+  # < warm 为冷号
+
+# 回测设置（v2 用）
+backtest:
+  train_window: 500    # 用前 N 期训练
+  test_periods: 100    # 测最近 N 期
+  hit_strategy: "top_k"  # top_k | threshold | cold_rebound
+
+# 可视化
+ui:
+  theme: "dark"        # dark | light
+  port: 8765
+  refresh_seconds: 60

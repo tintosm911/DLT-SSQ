@@ -1,0 +1,25 @@
+# 大乐透冷热度工具 - 依赖清单
+# Python 3.10+
+
+# 核心数据/计算
+pandas>=2.0.0
+numpy>=1.24.0
+pyyaml>=6.0
+
+# 数据采集
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# 可视化（HTML 仪表盘）
+plotly>=5.17.0
+jinja2>=3.1.0
+
+# Web 仪表盘（本地浏览器查看）
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# 工具
+tqdm>=4.66.0
+loguru>=0.7.0
+pydantic>=2.5.0

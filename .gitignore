@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# 数据缓存（可重建）
+data-raw/cache/
+data-normalized/*.parquet
+data-normalized/*.tmp
+
+# 日志
+logs/
+*.log
+
+# 浏览器会话
+ui/static/sessions/
+
+# 敏感
+.env
+*.key
+
+# ====== 项目特定 ======
+
+# 大文件: SQLite 派生库 (从 CSV 可重建)
+data-raw/lottery.db
+
+# 个人投注历史 (NDJSON / CSV, 隐私)
+data-raw/my_picks.jsonl
+data-raw/my_picks.csv
+
+# Tauri 编译产物 (桌面端可重编译)
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# 临时脚本 (一次性验证)
+scripts/probe_*.py
+scripts/_probe_*.py
+tests/probe_*.py
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 笔记草稿
+docs/.drafts/
+*.tmp~
