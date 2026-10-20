@@ -1,13 +1,11 @@
-# 🎰 中国彩票预测与分析工具
+﻿# 🎰 中国彩票预测与分析工具
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-8%2F8%20passing-brightgreen.svg)](./tests/test_pick_advisor.py)
-[![GitHub stars](https://img.shields.io/github/stars/REPLACE_USER/REPLACE_REPO.svg?style=social)](https://github.com/REPLACE_USER/REPLACE_REPO)
-[![Repo size](https://img.shields.io/github/repo-size/REPLACE_USER/REPLACE_REPO.svg)](https://github.com/REPLACE_USER/REPLACE_REPO)
+[![GitHub stars](https://img.shields.io/github/stars/tintosm911/tintosm911.svg?style=social)](https://github.com/tintosm911/tintosm911)
+[![Repo size](https://img.shields.io/github/repo-size/tintosm911/tintosm911.svg)](https://github.com/tintosm911/tintosm911)
 [![Code lines](https://img.shields.io/badge/Code-28.9k%20lines-blueviolet.svg)](./CHANGELOG.md)
-
-> ⚠️ **首次 fork/push 之前**：请把上方 3 个 `REPLACE_USER/REPLACE_REPO` 替换成你的 GitHub 用户名和仓库名。
 
 > **重要声明**: 彩票是**数学上必输**的游戏, 任何选号策略都不能改变期望值。本项目所有算法 + 数据分析只为教学和研究目的。
 
