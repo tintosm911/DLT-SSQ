@@ -18,6 +18,29 @@
 
 ## ⚡ 快速开始
 
+### 四个入口（都共用 `data/pick_advisor.py` 核心库）
+
+```bash
+# ① CLI — 历史期验证 / 算法评分 / 随机对照
+python scripts/evaluate_picks.py check --game dlt --period 26119 \
+    --front 3 6 20 24 32 --back 4 7
+python scripts/evaluate_picks.py score --game dlt --front 5 10 15 25 30 --back 3 8
+python scripts/evaluate_picks.py oracle --game dlt --last 100 --seed 42
+
+# ② Web GUI — 浏览器开 http://127.0.0.1:9876
+python scripts/pick_gui.py
+
+# ③ 胆拖分析器 — 你的 70 注花了多少、期望是多少、剔除大奖后真实回多少
+python scripts/dan_tuo.py --draws 200000
+python scripts/dan_tuo.py --game ssq --front-dan "01 07" \
+    --front-tuo "05 12 19 23 28 31" --back-dan "09" --back-tuo "03 15"
+
+# ④ 端到端诚实演示 — 证明"完美预测"≠"正期望"
+python scripts/demo_e2e.py
+```
+
+### 系统运维
+
 ```bash
 # 1. 健康检查 (9 项)
 python scripts/health_check.py
@@ -32,6 +55,25 @@ python main.py crawl --game all
 # 4. 端到端冒烟测试
 python smoke_test.py
 ```
+
+### 胆拖分析器输出什么
+
+```
+【2】展开成多少注 / 花多少钱
+    前区: 2 胆 + 从 7 拖里选 3 = C(7,3) = 35 种
+    后区: 1 胆 + 从 2 拖里选 1 = C(2,1) = 2 种
+    合计: 35 × 2 = 70 注,  花费: 140 元
+
+【3】期望值
+    70 注期望净收益: -69.31 元,  凯利 f* = 0.000
+
+【5】模拟 20 万次开奖
+    实测净收益(含大奖):   +32.37 元      <- 假象
+    剔除大奖后的常态:     -118.78 元     <- 真实期望
+    一次大奖能掩盖 200,000 次亏损
+```
+
+**"剔除大奖后的常态净收益"是这个工具最重要的数字** —— 它揭示了为什么买彩票的人会以为自己在赚钱。
 
 ## 🎯 核心结论 (真实数据 6500+ 期)
 
@@ -48,6 +90,7 @@ python smoke_test.py
 体育彩票预测项目/
 ├── data/                 数据层
 │   ├── games.py            彩种配置中心 (DLT/SSQ 共用接口)
+│   ├── pick_advisor.py     ★ 决策核心库 (CLI/Web/胆拖 三入口共用)
 │   ├── sqlite_storage.py   SQLite 持久化 (含 schema 迁移 + UNIQUE 约束)
 │   ├── ttz_fetcher.py      天天走势采集 (maxsize=100 限)
 │   ├── zhcw_fetcher.py     中彩网采集 (静态 JSON + JSONP 双源)
@@ -73,9 +116,13 @@ python smoke_test.py
 │
 ├── third_party/          DrawScope 0.6.5 引擎 (源码)
 ├── scripts/              工具脚本
-│   ├── health_check.py     9 项健康检查 (可自动修复)
-│   ├── sports_lab.py       竞彩端到端入口
-│   └── drawscope_*.py      DrawScope 演示
+│   ├── evaluate_picks.py    ★ ① CLI (check/score/oracle/live/history)
+│   ├── pick_gui.py          ★ ② Web GUI (Flask, 端口 9876)
+│   ├── dan_tuo.py           ★ ③ 胆拖分析器 (含剔除大奖的真实期望)
+│   ├── demo_e2e.py          ★ ④ 端到端诚实演示
+│   ├── health_check.py       9 项健康检查 (可自动修复)
+│   ├── sports_lab.py         竞彩端到端入口
+│   └── drawscope_*.py        DrawScope 演示
 │
 ├── data-raw/             真实数据 (CSV)
 │   ├── gh_dlt.csv         ★ 大乐透 2937 期
