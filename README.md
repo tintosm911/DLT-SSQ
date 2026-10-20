@@ -3,8 +3,8 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-8%2F8%20passing-brightgreen.svg)](./tests/test_pick_advisor.py)
-[![GitHub stars](https://img.shields.io/github/stars/tintosm911/tintosm911.svg?style=social)](https://github.com/tintosm911/tintosm911)
-[![Repo size](https://img.shields.io/github/repo-size/tintosm911/tintosm911.svg)](https://github.com/tintosm911/tintosm911)
+[![GitHub stars](https://img.shields.io/github/stars/tintosm911/%E5%BD%A9%E7%A5%A8%E5%AE%9E%E9%AA%8C%E5%AE%A4.svg?style=social)](https://github.com/tintosm911/%E5%BD%A9%E7%A5%A8%E5%AE%9E%E9%AA%8C%E5%AE%A4)
+[![Repo size](https://img.shields.io/github/repo-size/tintosm911/%E5%BD%A9%E7%A5%A8%E5%AE%9E%E9%AA%8C%E5%AE%A4.svg)](https://github.com/tintosm911/%E5%BD%A9%E7%A5%A8%E5%AE%9E%E9%AA%8C%E5%AE%A4)
 [![Code lines](https://img.shields.io/badge/Code-28.9k%20lines-blueviolet.svg)](./CHANGELOG.md)
 
 > **重要声明**: 彩票是**数学上必输**的游戏, 任何选号策略都不能改变期望值。本项目所有算法 + 数据分析只为教学和研究目的。
