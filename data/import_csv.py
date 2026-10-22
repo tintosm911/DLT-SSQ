@@ -80,18 +80,31 @@ def read_csv(path: Path, game: str) -> List[Dict]:
     return out
 
 
-def import_sources(game: str, sources: List[str], verbose: bool = True) -> int:
-    """导入多个源 (后者覆盖前者, merged 优先)"""
+def import_sources(game: str, sources: List[str], verbose: bool = True,
+                   purge: bool = False) -> int:
+    """
+    导入多个源 (后者覆盖前者, merged 优先)
+
+    ⚠ 默认 **不清空** 数据库, 走 upsert。
+    历史教训: 早期版本先 DELETE 再导入, 导致 GitHub 全量历史 (3037+3516 期)
+    被 zhcw/ttz 的 100 期局部数据整体覆盖, 期数从 6553 掉到 402。
+    只有显式 purge=True 才清空 (用于重建库)。
+    """
     storage = SQLiteStorage(db_path=str(DB_PATH))
     total = 0
 
-    # 先清空该彩种, 保证干净导入
-    with storage._connect() as conn:
-        cur = conn.execute('DELETE FROM draws WHERE game=?', (game,))
-        deleted = cur.rowcount
-        conn.commit()
-    if verbose and deleted:
-        print(f'  清空旧数据: {deleted} 条')
+    if purge:
+        with storage._connect() as conn:
+            cur = conn.execute('DELETE FROM draws WHERE game=?', (game,))
+            deleted = cur.rowcount
+            conn.commit()
+        if verbose and deleted:
+            print(f'  [purge] 清空旧数据: {deleted} 条')
+    elif verbose:
+        with storage._connect() as conn:
+            existing = conn.execute(
+                'SELECT COUNT(*) FROM draws WHERE game=?', (game,)).fetchone()[0]
+        print(f'  [upsert] 保留现有 {existing} 条, 增量写入')
 
     for src in sources:
         path = DATA_RAW / f'{src}_{game}.csv'
