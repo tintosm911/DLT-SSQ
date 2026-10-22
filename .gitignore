@@ -32,6 +32,10 @@ ui/static/sessions/
 *.key
 .github_token
 token.txt
+.odds_api_key
+
+# 实时赔率快照 (可随时重新拉取, 不必进版本库)
+data-raw/sports/live_events.json
 
 # ====== 项目特定 ======
 
