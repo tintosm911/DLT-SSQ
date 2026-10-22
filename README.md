@@ -84,7 +84,7 @@ python scripts/sports_expectation.py --league premier-league   # 分析
 python scripts/sports_expectation.py --all-leagues --download  # 全联赛 + 拉数据
 ```
 
-### 📊 5 大联赛 · 35,016 场 · 结论稳定性检验
+### 📊 5 大联赛 · 41,691 场 · 结论稳定性检验
 
 ![5 大联赛竞彩结论稳定性](reports/headline_sports_stability.png)
 
@@ -94,7 +94,7 @@ python scripts/sports_expectation.py --all-leagues --download  # 全联赛 + 拉
 | 西甲 | 10,044 | 2.47% | **+1.510%** | -5.9% | **0 次** |
 | 意甲 | 7,220 | 2.95% | **+1.466%** | -5.3% | **0 次** |
 | 德甲 | 6,732 | 4.70% | **+1.522%** | -5.2% | **0 次** |
-| 法甲 | 3,420 | 0.91% | **+1.157%** | -5.6% | **0 次** |
+| 法甲 | 10,095 | 2.48% | **+1.472%** | -5.6% | **0 次** |
 
 **四个结论，跨 5 大联赛、32,380 场扫描，全部一致**：
 
