@@ -105,6 +105,29 @@ INDEX_HTML = """
   .stat .value { font-size: 20px; font-weight: bold; margin-top: 4px; }
   .disclaimer { background: #422006; border: 1px solid #f59e0b; color: #fbbf24;
                 padding: 12px; border-radius: 4px; font-size: 12px; margin-top: 16px; }
+  .dt-hint { background: #0f172a; border: 1px solid #1e293b; border-radius: 4px;
+             padding: 8px 12px; font-size: 12px; color: #94a3b8; margin: 8px 0 12px 0; }
+  .dt-grid .num-btn.dan { background: #dc2626; color: #fff; border-color: #fca5a5;
+                          box-shadow: 0 0 0 2px #7f1d1d; }
+  .dt-grid .num-btn.tuo { background: #1d4ed8; color: #fff; border-color: #93c5fd; }
+  .dt-grid .num-btn.dan:hover { background: #b91c1c; }
+  .dt-grid .num-btn.tuo:hover { background: #1e40af; }
+  .dt-legend { display:flex; gap:14px; align-items:center; font-size:12px;
+               color:#94a3b8; margin:4px 0 8px 0; }
+  .dt-legend span.k { display:inline-block; padding:1px 8px; border-radius:3px;
+                      margin-right:4px; font-size:11px; }
+  .k-dan { background:#dc2626; color:#fff; }
+  .k-tuo { background:#1d4ed8; color:#fff; }
+  .k-none { background:#0f172a; border:1px solid #334155; }
+  .card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+               gap:10px; margin:10px 0; }
+  .mini-card { background:#0f172a; border:1px solid #1e293b; border-radius:6px;
+               padding:10px 12px; }
+  .mini-card .lbl { font-size:11px; color:#94a3b8; }
+  .mini-card .val { font-size:19px; font-weight:bold; margin-top:2px; }
+  .val.neg { color:#f87171; }
+  .val.pos { color:#4ade80; }
+  .section-title.tight { margin-top:16px; }
 </style>
 </head>
 <body>
@@ -115,7 +138,8 @@ INDEX_HTML = """
   <div class="tabs">
     <button class="tab active" data-tab="check">① 历史期验证</button>
     <button class="tab" data-tab="score">② 算法评分</button>
-    <button class="tab" data-tab="history">③ 历史记录</button>
+    <button class="tab" data-tab="dantuo">③ 胆拖分析</button>
+    <button class="tab" data-tab="history">④ 历史记录</button>
   </div>
 
   <!-- Tab 1: check -->
@@ -169,7 +193,44 @@ INDEX_HTML = """
     <div class="result" id="score-result">点击"评分"开始...</div>
   </div>
 
-  <!-- Tab 3: history -->
+  <!-- Tab 3: 胆拖分析 -->
+  <div class="panel hidden" id="panel-dantuo">
+    <div class="row">
+      <label>彩种:</label>
+      <select id="dt-game" onchange="dtRebuild()">
+        <option value="dlt">大乐透</option>
+        <option value="ssq">双色球</option>
+      </select>
+      <label>模拟次数:</label>
+      <select id="dt-draws">
+        <option value="0">跳过模拟 (只算期望)</option>
+        <option value="50000">5 万次</option>
+        <option value="100000" selected>10 万次</option>
+        <option value="200000">20 万次</option>
+        <option value="500000">50 万次</option>
+      </select>
+      <button onclick="dtAnalyze()">开始分析</button>
+      <span id="dt-status" style="font-size:12px;color:#94a3b8"></span>
+    </div>
+
+    <div class="dt-hint">
+      胆码 = 必选号 (每注都含) &nbsp;|&nbsp; 拖码 = 备选号 (系统自动补足)
+    </div>
+
+    <div class="section-title" id="dt-front-title">前区 — 点击号码切换: 无 → 胆 → 拖</div>
+    <div id="dt-front-grid" class="num-grid dt-grid"></div>
+    <div class="section-title" id="dt-back-title">后区</div>
+    <div id="dt-back-grid" class="num-grid dt-grid"></div>
+
+    <div class="row" style="margin-top:12px">
+      <button class="secondary" onclick="dtClear()">清空</button>
+      <button class="secondary" onclick="dtFillExample()">填入示例 (70 注 / 140 元)</button>
+    </div>
+
+    <div class="result" id="dt-result">选好胆码和拖码后点"开始分析"</div>
+  </div>
+
+  <!-- Tab 4: history -->
   <div class="panel hidden" id="panel-history">
     <div class="stats" id="history-stats"></div>
     <table class="history-table" id="history-table">
@@ -247,6 +308,209 @@ function updateGridsState(tabId) {
     const needed = part === 'front' ? game.front_count : game.back_count;
     // 可视化: 选满后变色
   }
+}
+
+// ============================================================
+// Tab 3: 胆拖分析 (三态号码网格: 无 → 胆 → 拖 → 无)
+// ============================================================
+function dtRebuild() {
+  const game = GAMES[document.getElementById('dt-game').value];
+  const mk = (containerId, range) => {
+    const grid = document.getElementById(containerId);
+    grid.innerHTML = '';
+    for (let n = 1; n <= range; n++) {
+      const btn = document.createElement('div');
+      btn.className = 'num-btn';
+      btn.dataset.num = n;
+      btn.dataset.state = 'none';
+      btn.textContent = n;
+      btn.onclick = () => {
+        // 三态循环: none → dan → tuo → none
+        const s = btn.dataset.state;
+        const next = s === 'none' ? 'dan' : (s === 'dan' ? 'tuo' : 'none');
+        btn.dataset.state = next;
+        btn.classList.remove('dan', 'tuo');
+        if (next !== 'none') btn.classList.add(next);
+        dtUpdateHint();
+      };
+      grid.appendChild(btn);
+    }
+  };
+  mk('dt-front-grid', game.front_range);
+  mk('dt-back-grid', game.back_range);
+  document.getElementById('dt-front-title').textContent =
+    `${game.front_label} — 点击切换: 无 → 胆码 → 拖码`;
+  document.getElementById('dt-back-title').textContent =
+    `${game.back_label} — 点击切换: 无 → 胆码 → 拖码`;
+  dtUpdateHint();
+}
+
+function dtCollect() {
+  const collect = (containerId) => {
+    const dan = [], tuo = [];
+    document.querySelectorAll(`#${containerId} .num-btn`).forEach(b => {
+      const n = +b.dataset.num;
+      if (b.dataset.state === 'dan') dan.push(n);
+      else if (b.dataset.state === 'tuo') tuo.push(n);
+    });
+    return { dan: dan.sort((a,b)=>a-b), tuo: tuo.sort((a,b)=>a-b) };
+  };
+  return { front: collect('dt-front-grid'), back: collect('dt-back-grid') };
+}
+
+function dtUpdateHint() {
+  const c = dtCollect();
+  const g = GAMES[document.getElementById('dt-game').value];
+  const needF = g.front_count - c.front.dan.length;
+  const needB = g.back_count - c.back.dan.length;
+  const status = document.getElementById('dt-status');
+  const bits = [];
+  bits.push(`前区: ${c.front.dan.length} 胆 ${c.front.tuo.length} 拖 (还需从拖里补 ${needF})`);
+  bits.push(`后区: ${c.back.dan.length} 胆 ${c.back.tuo.length} 拖 (还需 ${needB})`);
+  if (needF < 0 || needB < 0) {
+    status.innerHTML = '<span style="color:#f87171">胆码超过要求, 请减少</span>';
+  } else if (c.front.dan.length + c.front.tuo.length === 0 &&
+             c.back.dan.length + c.back.tuo.length === 0) {
+    status.textContent = '';
+  } else {
+    status.textContent = bits.join(' | ');
+  }
+}
+
+function dtClear() {
+  document.querySelectorAll('#dt-front-grid .num-btn, #dt-back-grid .num-btn')
+    .forEach(b => { b.dataset.state = 'none'; b.classList.remove('dan', 'tuo'); });
+  document.getElementById('dt-result').innerHTML = '选好胆码和拖码后点"开始分析"';
+  dtUpdateHint();
+}
+
+function dtFillExample() {
+  dtClear();
+  const game = document.getElementById('dt-game').value;
+  const sets = game === 'dlt'
+    ? { fd: [4, 9],   ft: [2, 7, 12, 22, 23, 29, 32], bd: [4],  bt: [5, 8] }
+    : { fd: [1, 7],   ft: [5, 12, 19, 23, 28, 31],    bd: [9],  bt: [3, 15] };
+  const mark = (gridId, nums, state) => {
+    document.querySelectorAll(`#${gridId} .num-btn`).forEach(b => {
+      if (nums.includes(+b.dataset.num)) {
+        b.dataset.state = state;
+        b.classList.remove('dan', 'tuo');
+        b.classList.add(state);
+      }
+    });
+  };
+  mark('dt-front-grid', sets.fd, 'dan');
+  mark('dt-front-grid', sets.ft, 'tuo');
+  mark('dt-back-grid', sets.bd, 'dan');
+  mark('dt-back-grid', sets.bt, 'tuo');
+  dtUpdateHint();
+}
+
+async function dtAnalyze() {
+  const c = dtCollect();
+  const g = GAMES[document.getElementById('dt-game').value];
+  if (c.front.dan.length + c.front.tuo.length === 0 &&
+      c.back.dan.length + c.back.tuo.length === 0) {
+    document.getElementById('dt-result').innerHTML =
+      '<span class="alert">请先选胆码或拖码</span>';
+    return;
+  }
+  const status = document.getElementById('dt-status');
+  const draws = parseInt(document.getElementById('dt-draws').value);
+  status.textContent = draws > 0 ? `模拟 ${draws.toLocaleString()} 次开奖中...` : '计算中...';
+  const t0 = Date.now();
+  try {
+    const r = await api('dan-tuo', {
+      game: document.getElementById('dt-game').value,
+      front_dan: c.front.dan, front_tuo: c.front.tuo,
+      back_dan: c.back.dan,  back_tuo: c.back.tuo,
+      draws: draws,
+      seed: 42,
+    });
+    const dt = ((Date.now() - t0) / 1000).toFixed(1);
+    status.textContent = `✓ 完成 (${dt}s)`;
+    document.getElementById('dt-result').innerHTML = dtRender(r);
+  } catch (e) {
+    status.textContent = '';
+    document.getElementById('dt-result').innerHTML =
+      `<span class="alert">错误: ${e.message}</span>`;
+  }
+}
+
+function dtRender(r) {
+  const t = r.tickets, e = r.expected, s = r.simulation;
+  const fmt = n => (n < 0 ? '' : '+') + n.toFixed(2);
+  let h = '';
+
+  h += `<b>${r.game_name}</b> 胆拖分析<br>`;
+  h += `<span style="color:#64748b">前胆 ${r.parse.front_dan.map(n=>String(n).padStart(2,'0')).join(' ') || '无'}`;
+  h += ` | 前拖 ${r.parse.front_tuo.map(n=>String(n).padStart(2,'0')).join(' ') || '无'}`;
+  h += ` | 后胆 ${r.parse.back_dan.map(n=>String(n).padStart(2,'0')).join(' ') || '无'}`;
+  h += ` | 后拖 ${r.parse.back_tuo.map(n=>String(n).padStart(2,'0')).join(' ') || '无'}</span><br><br>`;
+
+  h += `<b style="color:#fbbf24">【展开成多少注 / 花多少钱】</b><br>`;
+  h += `前区: ${r.parse.front_dan.length} 胆 + 从 ${r.parse.front_tuo.length} 拖选 ${t.need_front} = C(${r.parse.front_tuo.length},${t.need_front}) = ${t.n_front_combos} 种<br>`;
+  h += `后区: ${r.parse.back_dan.length} 胆 + 从 ${r.parse.back_tuo.length} 拖选 ${t.need_back} = C(${r.parse.back_tuo.length},${t.need_back}) = ${t.n_back_combos} 种<br>`;
+  h += `合计: <b>${t.count} 注</b> · 花费 <b>${t.total_cost} 元</b><br><br>`;
+
+  h += `<b style="color:#fbbf24">【期望值】</b><br>`;
+  h += `单注期望净收益: ${fmt(e.per_bet_net)} 元<br>`;
+  h += `<b>${t.count} 注期望净收益: <span class="${e.total_net < 0 ? 'miss' : 'hit'}">${fmt(e.total_net)} 元</span></b><br>`;
+  h += `凯利最优 f* = <b class="${e.kelly <= 0 ? 'miss' : 'hit'}">${e.kelly.toFixed(3)}</b>`;
+  if (e.kelly <= 0) h += ` (公式说: 不下注)`;
+  h += `<br>`;
+  h += `一等奖概率: 单注 ${e.first_prize_odds} → ${t.count} 注 <b>${e.cover_first_prize_odds}</b> (${e.cover_multiple}x 覆盖)<br>`;
+  h += `理论最好情况: ${r.best_case.toLocaleString()} 元 (完美预测)<br><br>`;
+
+  if (s && s.draws > 0) {
+    h += `<b style="color:#fbbf24">【模拟 ${s.draws.toLocaleString()} 次开奖】</b><br>`;
+    h += `<div class="card-grid">`;
+    h += `<div class="mini-card"><div class="lbl">中奖概率</div><div class="val">${s.win_rate}%</div></div>`;
+    h += `<div class="mini-card"><div class="lbl">一次不中</div><div class="val neg">${s.lose_rate}%</div></div>`;
+    h += `<div class="mini-card"><div class="lbl">含大奖净收益</div><div class="val ${s.net_with_big >= 0 ? 'pos' : 'neg'}">${fmt(s.net_with_big)}</div></div>`;
+    h += `<div class="mini-card"><div class="lbl">剔除大奖后</div><div class="val ${s.net_no_big >= 0 ? 'pos' : 'neg'}">${fmt(s.net_no_big)}</div></div>`;
+    h += `</div>`;
+    h += `常态平均返奖: ${s.mean_return_no_big.toFixed(2)} 元/期<br>`;
+    h += `大奖命中: ${s.big_count} 次 (占 ${s.big_pct}%)<br>`;
+    if (s.big_count > 0) {
+      h += `<br><span class="warning">[!] 上面 ${fmt(s.net_with_big)} 元是被 ${s.big_count} 次大奖拉高的假象.</span><br>`;
+      h += `<span class="warning">　　一次大奖能掩盖 ${s.draws.toLocaleString()} 次亏损. 这就是彩票最有害的地方.</span><br>`;
+    }
+    h += `最坏情况: ${s.worst_case} 元 (一次不中)<br><br>`;
+    if (s.prizes && s.prizes.length) {
+      h += `<b>各奖级命中次数</b><br>`;
+      for (const p of s.prizes) {
+        h += `<span class="pill">${p.label} × ${p.count.toLocaleString()}</span>`;
+      }
+      h += `<br><br>`;
+    }
+  }
+
+  if (r.scores && r.scores.front) {
+    h += `<b style="color:#fbbf24">【7 算法评分 (最近 300 期)】</b><br>`;
+    const danSet = new Set((r.scores.dan || []).map(Number));
+    const line = (obj, label) => {
+      const nums = Object.keys(obj).map(Number).sort((a, b) => a - b);
+      if (!nums.length) return '';
+      let line = `${label}: `;
+      for (const n of nums) {
+        const sc = obj[String(n)];
+        const tag = danSet.has(n) ? '胆' : '拖';
+        const cls = sc >= 70 ? 'hot' : (sc < 30 ? 'cold' : '');
+        line += `<span class="pill ${cls}">${String(n).padStart(2,'0')}(${tag})=${Math.round(sc)}</span>`;
+      }
+      return line + '<br>';
+    };
+    h += line(r.scores.front, '前区');
+    h += line(r.scores.back, '后区');
+  }
+
+  h += `<br><b style="color:#fbbf24">【关键对比】</b><br>`;
+  h += `两种方式都花 ${t.total_cost} 元, 买 ${t.count} 注, 期望净收益都是 ${fmt(e.total_net)} 元.<br>`;
+  h += `胆拖唯一的实际效果: 覆盖更多组合 → 一等奖概率提高 ${t.count} 倍, 中奖率升到 ${s ? s.win_rate + '%' : 'N/A'}.<br>`;
+  h += `期望值一点没变 —— 数学上完全等价.`;
+
+  return h;
 }
 
 // 切换彩种时重建网格
@@ -437,6 +701,7 @@ async function loadHistory() {
 }
 
 buildGrids();
+dtRebuild();
 </script>
 </body>
 </html>
@@ -543,6 +808,62 @@ def api_games():
         'front_range': g.front_range, 'front_count': g.front_count,
         'back_range': g.back_range, 'back_count': g.back_count,
     } for g in [get_game(c) for c in list_games()]]})
+
+
+@app.route('/api/dan-tuo', methods=['POST'])
+def api_dan_tuo():
+    """
+    胆拖分析 (Tab ④)
+    body: {game, front_dan:[], front_tuo:[], back_dan:[], back_tuo:[],
+           draws:int, seed:int}
+    """
+    try:
+        from data.dan_tuo_core import analyze_dan_tuo
+        body = request.get_json() or {}
+        game = body.get('game', 'dlt')
+        draws = int(body.get('draws', 200_000))
+        seed = body.get('seed')
+        seed = int(seed) if seed is not None else 42
+        # 上限保护: Web 单次最多 50 万次, 免得把机器跑满
+        draws = max(0, min(draws, 500_000))
+
+        result = analyze_dan_tuo(
+            game,
+            body.get('front_dan', []),
+            body.get('front_tuo', []),
+            body.get('back_dan', []),
+            body.get('back_tuo', []),
+            n_draws=draws,
+            seed=seed,
+        )
+        # numpy 标量转原生类型, 否则 jsonify 序列化失败
+        return jsonify(_jsonable(result))
+    except ValueError as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+def _jsonable(obj):
+    """把 numpy 标量 / ndarray / set 递归转成原生 Python 类型"""
+    import numpy as _np
+    if isinstance(obj, dict):
+        return {str(k): _jsonable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_jsonable(v) for v in obj]
+    if isinstance(obj, (set, frozenset)):
+        return [_jsonable(v) for v in obj]
+    if isinstance(obj, _np.integer):
+        return int(obj)
+    if isinstance(obj, _np.floating):
+        return float(obj)
+    if isinstance(obj, _np.bool_):
+        return bool(obj)
+    if isinstance(obj, _np.ndarray):
+        return _jsonable(obj.tolist())
+    return obj
 
 
 # ============================================================
