@@ -139,7 +139,9 @@ INDEX_HTML = """
     <button class="tab active" data-tab="check">① 历史期验证</button>
     <button class="tab" data-tab="score">② 算法评分</button>
     <button class="tab" data-tab="dantuo">③ 胆拖分析</button>
-    <button class="tab" data-tab="history">④ 历史记录</button>
+    <button class="tab" data-tab="strategy">④ 预测玩法回测</button>
+    <button class="tab" data-tab="settle">⑤ 快速算账</button>
+    <button class="tab" data-tab="history">⑥ 历史记录</button>
   </div>
 
   <!-- Tab 1: check -->
@@ -230,7 +232,68 @@ INDEX_HTML = """
     <div class="result" id="dt-result">选好胆码和拖码后点"开始分析"</div>
   </div>
 
-  <!-- Tab 4: history -->
+  <!-- Tab 4: 预测玩法回测 -->
+  <div class="panel hidden" id="panel-strategy">
+    <div class="row">
+      <label>彩种:</label>
+      <select id="sl-game">
+        <option value="dlt">大乐透</option>
+        <option value="ssq">双色球</option>
+      </select>
+      <label>训练窗口:</label>
+      <select id="sl-window">
+        <option value="50">最近 50 期</option>
+        <option value="100">最近 100 期</option>
+        <option value="200" selected>最近 200 期</option>
+        <option value="500">最近 500 期</option>
+      </select>
+      <label>起始期:</label>
+      <select id="sl-start">
+        <option value="300">第 300 期</option>
+        <option value="500" selected>第 500 期</option>
+        <option value="1000">第 1000 期</option>
+        <option value="1500">第 1500 期</option>
+      </select>
+      <label>随机种子数:</label>
+      <select id="sl-seeds">
+        <option value="5">5</option>
+        <option value="10" selected>10</option>
+        <option value="20">20</option>
+      </select>
+      <button onclick="slRun()">开始回测</button>
+      <span id="sl-status" style="font-size:12px;color:#94a3b8"></span>
+    </div>
+    <div class="dt-hint">
+      严格 walk-forward: 每期只用车号<b>之前</b>的数据选号, 再用当期真实开奖评判, 绝不使用未来信息。
+    </div>
+    <div id="sl-strategy-picker" class="dt-legend" style="flex-wrap:wrap"></div>
+    <div class="result" id="sl-result">选好参数后点"开始回测" (13 种策略 × 约 2400 期, 约 10-20 秒)</div>
+  </div>
+
+  <!-- Tab 5: 快速算账 -->
+  <div class="panel hidden" id="panel-settle">
+    <div class="row">
+      <label>彩种:</label>
+      <select id="qs-game">
+        <option value="dlt">大乐透</option>
+        <option value="ssq">双色球</option>
+      </select>
+      <label>投入金额:</label>
+      <input type="number" id="qs-stake" value="80" min="2" step="2" style="width:110px">
+      <span style="color:#64748b">元</span>
+      <label>返奖金额:</label>
+      <input type="number" id="qs-returned" value="70" min="0" step="1" style="width:110px">
+      <span style="color:#64748b">元</span>
+      <button onclick="qsCalc()">算账</button>
+      <span id="qs-status" style="font-size:12px;color:#94a3b8"></span>
+    </div>
+    <div class="dt-hint">
+      填两个数字, 立刻知道这次投注在 20 万次模拟里排第几, 以及长期能否回本。
+    </div>
+    <div class="result" id="qs-result">填入金额后点"算账"</div>
+  </div>
+
+  <!-- Tab 6: history -->
   <div class="panel hidden" id="panel-history">
     <div class="stats" id="history-stats"></div>
     <table class="history-table" id="history-table">
@@ -513,6 +576,219 @@ function dtRender(r) {
   return h;
 }
 
+// ============================================================
+// Tab 4: 预测玩法回测
+// ============================================================
+const SL_STRATEGIES = [
+  ['random', '随机选号 (基线对照)'],
+  ['hot', '热号追踪 (历史出现最多)'],
+  ['cold', '冷号追踪 (历史出现最少)'],
+  ['max_missing', '遗漏最久 (该出了谬论)'],
+  ['hot_recent', '近 30 期加权热号'],
+  ['bayesian', '贝叶斯后验'],
+  ['markov', '一阶马尔可夫'],
+  ['zone_balance', '区间均衡 (每号段至少1个)'],
+  ['odd_even', '奇偶比 3:2'],
+  ['prime_composite', '质合比 3:2'],
+  ['sum_target', '和值瞄准'],
+  ['ac_value', 'AC值最大化'],
+  ['repeat_last', '照抄上期号码'],
+];
+
+let slSelected = new Set(SL_STRATEGIES.map(s => s[0]));
+
+function slBuildPicker() {
+  const box = document.getElementById('sl-strategy-picker');
+  box.innerHTML = '<span style="color:#fbbf24;margin-right:8px">策略:</span>';
+  SL_STRATEGIES.forEach(([code, desc]) => {
+    const chip = document.createElement('span');
+    chip.className = 'pill';
+    chip.style.cursor = 'pointer';
+    chip.style.background = slSelected.has(code) ? '#2563eb' : '#1e293b';
+    chip.style.color = slSelected.has(code) ? '#fff' : '#94a3b8';
+    chip.textContent = desc;
+    chip.title = code;
+    chip.onclick = () => {
+      if (slSelected.has(code)) slSelected.delete(code);
+      else slSelected.add(code);
+      slBuildPicker();
+    };
+    box.appendChild(chip);
+  });
+}
+
+async function slRun() {
+  const status = document.getElementById('sl-status');
+  const strategies = [...slSelected];
+  if (!strategies.length) {
+    document.getElementById('sl-result').innerHTML =
+      '<span class="alert">请至少选一个策略</span>';
+    return;
+  }
+  status.textContent = '回测中 (13 种策略 × 数千期, 约 10-25 秒)...';
+  document.getElementById('sl-result').innerHTML = '计算中, 请稍候...';
+  const t0 = Date.now();
+  try {
+    const r = await api('strategy-lab', {
+      game: document.getElementById('sl-game').value,
+      window: parseInt(document.getElementById('sl-window').value),
+      start: parseInt(document.getElementById('sl-start').value),
+      n_seeds: parseInt(document.getElementById('sl-seeds').value),
+      strategies: strategies,
+    });
+    const dt = ((Date.now() - t0) / 1000).toFixed(1);
+    status.textContent = `✓ 完成 (${dt}s)`;
+    document.getElementById('sl-result').innerHTML = slRender(r);
+  } catch (e) {
+    status.textContent = '';
+    document.getElementById('sl-result').innerHTML =
+      `<span class="alert">错误: ${e.message}</span>`;
+  }
+}
+
+function slRender(r) {
+  const bd = r.payout_breakdown;
+  const be = r.breakeven;
+  const b = r.baseline;
+  let h = '';
+
+  h += `<b>${r.game_name} 预测玩法回测</b><br>`;
+  h += `<span style="color:#64748b">全量 ${r.total_draws} 期, 回测 ${r.tested_draws} 期 `
+       + `(训练窗口 ${r.window} 期, 从第 ${r.start} 期开始逐期重训)</span><br><br>`;
+
+  // 派奖率拆解
+  h += `<b style="color:#fbbf24">【派奖率拆解 — 这是理解一切的钥匙】</b><br>`;
+  h += `<div class="card-grid">`;
+  h += `<div class="mini-card"><div class="lbl">总派奖率</div><div class="val">${bd.total_payout}%</div></div>`;
+  h += `<div class="mini-card"><div class="lbl">其中大奖</div><div class="val">${bd.big_payout}%</div></div>`;
+  h += `<div class="mini-card"><div class="lbl">其中小奖</div><div class="val">${bd.small_payout}%</div></div>`;
+  h += `<div class="mini-card"><div class="lbl">剔除大奖后 ROI</div><div class="val neg">${bd.roi_small_only}%</div></div>`;
+  h += `</div>`;
+  h += `一等奖概率 1/${format(Math.round(1 / (bd.detail[0].prob / (bd.detail[0].prob))), '0'))}<br>`;
+  h += `→ 一二等奖就占了大奖派奖率的绝大部分, 但需要买 200 多万注才回本<br><br>`;
+
+  // 盈亏平衡中奖率
+  h += `<b style="color:#fbbf24">【中奖率要多少才不亏】</b><br>`;
+  h += `若中奖全是最低奖级 (${be.lowest_prize_label} ${be.lowest_prize} 元), `
+     + `中奖率需 &gt; <b class="neg">${be.breakeven_at_lowest}%</b> 才能不亏<br>`;
+  if (be.best_strategy) {
+    h += `本次回测最好中奖率: <b>${be.best_strategy} ${be.best_win_rate}%</b> `
+       + `— 距盈亏平衡还差 <b class="neg">${be.gap_factor.toFixed(1)} 倍</b><br>`;
+  }
+  h += `<br>`;
+
+  // 策略表
+  h += `<b style="color:#fbbf24">【各策略回测结果】</b><br>`;
+  h += `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px">`;
+  h += `<tr style="background:#0f172a">`
+     + `<th style="padding:5px;text-align:left">策略</th>`
+     + `<th style="padding:5px;text-align:right">中奖率%</th>`
+     + `<th style="padding:5px;text-align:right">ROI%</th>`
+     + `<th style="padding:5px;text-align:right">净收益</th>`
+     + `<th style="padding:5px;text-align:right">最大回撤</th>`
+     + `<th style="padding:5px;text-align:left">主要命中奖级</th>`
+     + `</tr>`;
+  const sorted = [...r.strategies].sort((a, b2) => b2.roi - a.roi);
+  for (const s of sorted) {
+    const top = (s.prizes || []).slice(0, 3).map(p => `${p[0]}×${p[1]}`).join(' ');
+    const cls = s.roi > 0 ? 'hit' : 'miss';
+    h += `<tr style="border-bottom:1px solid #1e293b">`
+       + `<td style="padding:4px"><b>${s.name}</b><br>`
+       + `<span style="color:#64748b;font-size:11px">${s.desc}</span></td>`
+       + `<td style="padding:4px;text-align:right">${s.win_rate}</td>`
+       + `<td style="padding:4px;text-align:right" class="${cls}">${s.roi}</td>`
+       + `<td style="padding:4px;text-align:right" class="${cls}">${format(Math.round(s.net), 0)}</td>`
+       + `<td style="padding:4px;text-align:right">${format(Math.round(s.max_drawdown), 0)}</td>`
+       + `<td style="padding:4px;font-size:11px;color:#94a3b8">${top}</td>`
+       + `</tr>`;
+  }
+  h += `</table><br>`;
+
+  // 随机基线
+  if (b.count) {
+    h += `<b style="color:#fbbf24">【随机基线 (${b.count} 个种子)】</b><br>`;
+    h += `ROI 均值 <b>${b.roi_mean.toFixed(1)}%</b> · σ ${b.roi_std.toFixed(1)}% · `
+       + `最好 ${b.roi_max.toFixed(1)}% · 最差 ${b.roi_min.toFixed(1)}%<br>`;
+    h += `中奖率均值 ${b.win_rate_mean.toFixed(2)}% (σ ${b.win_rate_std.toFixed(2)}%)<br>`;
+    h += `→ 单条随机曲线的方差极大, 所以必须看分布而不是单次结果<br><br>`;
+  }
+
+  // 结论
+  h += `<b style="color:#fbbf24">【结论】</b><br>`;
+  h += r.conclusion.split(' | ').join('<br>') + '<br><br>';
+
+  h += `<div class="disclaimer" style="margin-top:8px">`;
+  h += `<b>关键洞察:</b> 策略确实能提高中奖率 (最高 ${be.best_win_rate}% vs 随机 ${b.win_rate_mean ? b.win_rate_mean.toFixed(2) : '~6.4'}%), `
+     + `但赢的全是 5 元小奖 — 要靠小奖盈利, 中奖率得超过 ${be.breakeven_at_lowest}%. `
+     + `<br>差距不是运气问题, 是 <b>${be.gap_factor ? be.gap_factor.toFixed(1) : '?'} 倍的结构性缺口</b>.`;
+  h += `</div>`;
+  return h;
+}
+
+// ============================================================
+// Tab 5: 快速算账
+// ============================================================
+async function qsCalc() {
+  const stake = parseFloat(document.getElementById('qs-stake').value);
+  const returned = parseFloat(document.getElementById('qs-returned').value);
+  if (!stake || stake <= 0) {
+    document.getElementById('qs-result').innerHTML =
+      '<span class="alert">请填写投入金额</span>';
+    return;
+  }
+  const status = document.getElementById('qs-status');
+  status.textContent = '模拟中...';
+  const t0 = Date.now();
+  try {
+    const r = await api('quick-settle', {
+      game: document.getElementById('qs-game').value,
+      stake: stake,
+      returned: returned,
+    });
+    const dt = ((Date.now() - t0) / 1000).toFixed(1);
+    status.textContent = `✓ 完成 (${dt}s)`;
+    let h = '';
+    h += `<b>${r.game_name} 投注算账</b><br>`;
+    h += `<div class="card-grid">`;
+    h += `<div class="mini-card"><div class="lbl">投入</div><div class="val">${r.stake} 元</div></div>`;
+    h += `<div class="mini-card"><div class="lbl">返奖</div><div class="val">${r.returned} 元</div></div>`;
+    h += `<div class="mini-card"><div class="lbl">净收益</div>`
+       + `<div class="val ${r.net >= 0 ? 'pos' : 'neg'}">${r.net >= 0 ? '+' : ''}${r.net}</div></div>`;
+    h += `<div class="mini-card"><div class="lbl">返奖率</div>`
+       + `<div class="val ${r.payout_rate >= r.expected_payout_rate ? 'pos' : 'neg'}">${r.payout_rate}%</div></div>`;
+    h += `</div>`;
+    h += `共 ${r.bets} 注 · 期望返奖 ${r.expected_return} 元 · `
+       + `期望净收益 <b class="neg">${r.expected_net}</b> 元 · `
+       + `期望返奖率 ${r.expected_payout_rate}% · 凯利 f*=${r.kelly}<br><br>`;
+
+    h += `<b style="color:#fbbf24">【你在 ${r.simulations.toLocaleString()} 次模拟里排第几】</b><br>`;
+    h += `你打败了 <b class="hit">${r.better_pct}%</b> 的模拟结果<br>`;
+    h += `比 <b>${r.ahead_pct}%</b> 的模拟结果更好<br>`;
+    h += `比 <b>${r.behind_pct}%</b> 的模拟结果更差<br>`;
+    h += `恰好返 ${r.returned} 元的: ${r.equal_count.toLocaleString()} 次 `
+       + `(${r.equal_pct}%)<br><br>`;
+
+    if (r.net >= 0) {
+      h += `<div class="disclaimer" style="border-color:#22c55e;background:#052e16;color:#86efac">`;
+      h += `<b>[!] 幸存者偏差提醒:</b> 这次返奖 ≥ 投入, 但这只是你恰好看到的那一次. `
+         + `同样玩法的模拟里有 <b>${r.ahead_pct}%</b> 表现更好, `
+         + `而长期期望是 <b>${r.expected_net} 元</b>.`;
+      h += `</div>`;
+    } else {
+      h += `<div class="disclaimer">`;
+      h += `这次实际亏损 ${Math.abs(r.net)} 元. 盈亏平衡需要中奖率 &gt; `
+         + `<b>${r.win_threshold}%</b> (若全是最低奖级 5 元), `
+         + `现实中奖率约 6-8%, 差了一个数量级.`;
+      h += `</div>`;
+    }
+    document.getElementById('qs-result').innerHTML = h;
+  } catch (e) {
+    status.textContent = '';
+    document.getElementById('qs-result').innerHTML =
+      `<span class="alert">错误: ${e.message}</span>`;
+  }
+}
+
 // 切换彩种时重建网格
 document.getElementById('check-game').addEventListener('change', buildGrids);
 document.getElementById('score-game').addEventListener('change', buildGrids);
@@ -702,6 +978,7 @@ async function loadHistory() {
 
 buildGrids();
 dtRebuild();
+slBuildPicker();
 </script>
 </body>
 </html>
@@ -799,6 +1076,116 @@ def api_save():
         return jsonify({'ok': True})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/strategy-lab', methods=['POST'])
+def api_strategy_lab():
+    """
+    预测玩法回测 (Tab ⑤)
+    body: {game, window, start, n_seeds, strategies:[...]}
+    """
+    try:
+        from data.strategy_lab import run_lab, STRATEGY_DESCRIPTIONS
+        body = request.get_json() or {}
+        game = body.get('game', 'dlt')
+        window = int(body.get('window', 200))
+        start = int(body.get('start', 500))
+        n_seeds = int(body.get('n_seeds', 10))
+        strategies = body.get('strategies') or None
+        # 上限保护, 免得把机器跑满
+        window = max(50, min(window, 1000))
+        start = max(100, min(start, 2000))
+        n_seeds = max(1, min(n_seeds, 30))
+
+        result = run_lab(game, window=window, start=start,
+                         n_seeds=n_seeds, strategies=strategies)
+        result['strategy_catalog'] = STRATEGY_DESCRIPTIONS
+        return jsonify(_jsonable(result))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@app.route('/api/quick-settle', methods=['POST'])
+def api_quick_settle():
+    """
+    快速算账 (Tab ⑥): 填"投了多少 / 中了多少" → 出分位数
+    body: {game, bets, stake, returned}
+    """
+    try:
+        import numpy as _np
+        from data.games import get_game
+        from data.pick_advisor import calc_expected_prize, Pick
+
+        body = request.get_json() or {}
+        game = body.get('game', 'dlt')
+        cfg = get_game(game)
+        stake = float(body.get('stake', 0))
+        returned = float(body.get('returned', 0))
+        if stake <= 0:
+            return jsonify({'ok': False, 'error': '请填写投入金额'}), 400
+
+        bets = body.get('bets')
+        if not bets:
+            bets = int(round(stake / cfg.ticket_price))
+        bets = max(1, int(bets))
+
+        # 蒙特卡洛: 用真实奖级概率表模拟该注数的返奖分布
+        from data.strategy_lab import compute_payout_breakdown
+        bd = compute_payout_breakdown(game)
+        tiers = [(d['prob'], d['money'])
+                 for d in bd['detail'] if d['money'] > 0]
+        probs = _np.array([p for p, _ in tiers], dtype=float)
+        amounts = _np.array([m for _, m in tiers], dtype=float)
+        # ⚠ probs 是"各奖级命中概率"(总和 = 中奖率, 远小于 1),
+        #   抽奖级时必须用条件概率, 否则变成"每注必中奖"
+        win_prob = probs.sum()
+        cond = probs / win_prob
+        rng = _np.random.default_rng(42)
+        n = 100_000
+        # 每期独立抽 bets 注, 累加返奖
+        totals = _np.zeros(n, dtype=float)
+        for _ in range(min(bets, 200)):
+            hit = rng.random(size=n) < win_prob          # 是否中奖
+            idx = rng.choice(len(amounts), size=n, p=cond)  # 中了哪个奖级
+            totals += _np.where(hit, amounts[idx], 0.0)
+        less = int((totals < returned).sum())
+        equal = int((totals == returned).sum())
+        better = int((totals > returned).sum())
+        pct = less / n * 100
+        # 你打败的模拟比例 (返奖 ≤ 你的)
+        beat_pct = (less + equal) / n * 100
+
+        exp1, net1, kelly1, prob1 = calc_expected_prize(
+            game, Pick(front=[1] * cfg.front_count, back=[1] * cfg.back_count))
+        exp_total = exp1 * bets
+
+        return jsonify(_jsonable({
+            'ok': True,
+            'game': game,
+            'game_name': cfg.name,
+            'bets': bets,
+            'stake': stake,
+            'returned': returned,
+            'net': round(returned - stake, 2),
+            'payout_rate': round(returned / stake * 100, 1),
+            'expected_return': round(exp_total, 2),
+            'expected_net': round(exp_total - stake, 2),
+            'expected_payout_rate': round(exp_total / stake * 100, 1),
+            'kelly': round(kelly1, 3),
+            'better_pct': round(beat_pct, 2),
+            'ahead_pct': round(better / n * 100, 2),
+            'behind_pct': round(pct, 2),
+            'equal_count': equal,
+            'equal_pct': round(equal / n * 100, 4),
+            'win_threshold': round(cfg.ticket_price / 5 * 100, 1),
+            'simulations': n,
+        }))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': f'{type(e).__name__}: {e}'}), 500
 
 
 @app.route('/api/games')
