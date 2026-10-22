@@ -53,6 +53,8 @@
 - `scripts/analyze_dantuo.py` — 胆拖深度分析（精确版，含逐号冷热诊断）
 - `scripts/compare_dantuo_schemes.py` — 7 组结构横向对比
 - `scripts/dantuo_structure_matrix.py` — 胆码数量结构矩阵
+- `scripts/dantuo_final_compare.py` — 统一口径最终对比表
+- `scripts/make_dantuo_chart.py` — 胆拖结构分析图（三联图）
 - `scripts/hot_cold_snapshot.py` — 冷热快照工具
 
 ### 🧪 数据完整性审计

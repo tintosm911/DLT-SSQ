@@ -258,6 +258,34 @@ python smoke_test.py
 
 **DrawScope 0.6.5 引擎 (端到端黑盒)** 与我们手写 12 步得到**完全一致**的 χ² 值, 双重验证"号码分布无显著偏离均匀"。
 
+## 🎰 胆拖结构: 只有「胆码个数」影响中奖率
+
+![胆拖结构分析](reports/headline_dantuo.png)
+
+用**精确超几何全枚举**（零抽样误差）算出的结论：
+
+> **固定号码池下，胆拖方案的中奖率只取决于胆码的个数，
+> 与"胆码具体选哪几个号"完全无关。**
+
+这是组合数学的恒等式，不是统计现象 —— 每组 12 次随机换号做胆，中奖率 bit-for-bit 相同。
+所以**追热号、追冷号、追遗漏，在概率上完全等价**。
+
+| 结构 (前胆/后胆) | 注数 | 花费 | 中奖率 | ≥1万大奖 |
+|---|---|---|---|---|
+| 0 / 0（双区零胆全覆盖） | 4,620 | 9,240 元 | 47.43% | 0.261% |
+| 1 / 1（常规胆拖） | 840 | 1,680 元 | 42.97% | 0.102% |
+| 2 / 0（去后区胆） | 840 | 1,680 元 | **47.43%** | 0.047% |
+| 0 / 2（后区双胆） | 462 | 924 元 | 28.26% | 0.142% |
+
+**期望值一个都没变** —— 所有结构单注期望净收益都是 -0.9407 元。
+工具：
+```bash
+python scripts/analyze_dantuo.py          # 你的方案的精确分析 + 逐号冷热诊断
+python scripts/compare_dantuo_schemes.py   # 7 组结构横向对比
+python scripts/dantuo_structure_matrix.py  # 胆码数量结构矩阵
+python scripts/dantuo_final_compare.py    # 统一口径最终对比
+```
+
 ## 🏗️ 项目架构
 
 ```
@@ -297,6 +325,7 @@ python smoke_test.py
 │   ├── compare_dantuo_schemes.py  7 组胆拖结构横向对比
 │   ├── dantuo_structure_matrix.py  胆码数量结构矩阵
 │   ├── dantuo_final_compare.py     7 组方案统一口径对比
+│   ├── make_dantuo_chart.py        胆拖结构分析图
 │   ├── check_prize_consistency.py   奖级表 vs 判奖逻辑一致性
 │   ├── demo_e2e.py          ★ ④ 端到端诚实演示
 │   ├── health_check.py       11 项健康检查 (可自动修复)
