@@ -151,9 +151,20 @@ def check_csv() -> Dict[str, Any]:
 
 
 def check_data_quality() -> Dict[str, Any]:
-    """号码范围 + χ² 快速体检"""
+    """
+    号码范围 + 结构完整性 (硬错误) + χ² 偏离 (警告, 分年定位)
+
+    区分两类问题:
+      - **结构错误** (硬失败): 重复期号 / 号码越界 / 同期号码重复 / 期号格式不统一
+        → 说明采集或入库环节有 bug, 必须修
+      - **统计偏离** (警告): χ² 超阈值
+        → 可能是真实历史现象 (如 DLT 2007-2012), 也可能是数据问题,
+          用分年 χ² 定位可疑区段
+    """
     import csv as _csv
-    issues = []
+    from collections import Counter
+    hard = []
+    warn = []
     checked = 0
 
     for game, cfg in GAMES.items():
@@ -166,6 +177,9 @@ def check_data_quality() -> Dict[str, Any]:
         checked += 1
         freq: Dict[int, int] = {}
         n = 0
+        periods = []
+        yearly: Dict[str, Counter] = {}
+
         with open(path, 'r', encoding='utf-8') as f:
             for row in _csv.DictReader(f):
                 try:
@@ -174,25 +188,63 @@ def check_data_quality() -> Dict[str, Any]:
                 except (KeyError, ValueError):
                     continue
                 if not all(1 <= x <= cfg['front_range'] for x in front):
-                    issues.append(f'{game} 号码越界: {front}')
+                    hard.append(f'{game} 号码越界: {front}')
+                    break
+                if len(set(front)) != len(front) or len(set(back)) != len(back):
+                    hard.append(f'{game} 同期号码重复: {front}+{back}')
                     break
                 for x in front:
                     freq[x] = freq.get(x, 0) + 1
+                p = str(row.get('period', '')).strip()
+                periods.append(p)
+                yearly.setdefault(p[:4], Counter()).update(front)
                 n += 1
 
+        # --- 结构检查 ---
+        dup = [p for p, c in Counter(periods).items() if c > 1]
+        if dup:
+            hard.append(f'{game} 重复期号 {len(dup)} 个 (如 {dup[:3]})')
+        lens = Counter(len(p) for p in periods)
+        if len(lens) > 1:
+            hard.append(f'{game} 期号长度不统一: {dict(lens)}')
+
+        # --- χ² (警告级) ---
         if n:
             exp = n * cfg['front_count'] / cfg['front_range']
             chi2 = sum((c - exp) ** 2 / exp for c in freq.values())
             chi2 += (cfg['front_range'] - len(freq)) * exp
             dof = cfg['front_range'] - 1
             if chi2 > dof * 1.5:
-                issues.append(f'{game} χ²={chi2:.1f} 超过阈值 {dof*1.5:.0f} (可能数据有问题)')
+                # 分年定位可疑区段
+                bad_years = []
+                for yr, cnt in sorted(yearly.items()):
+                    if len(cnt) < 30:
+                        continue
+                    e = sum(cnt.values()) / cfg['front_range']
+                    c2 = sum((v - e) ** 2 / e for v in cnt.values())
+                    c2 += (cfg['front_range'] - len(cnt)) * e
+                    if c2 > dof * 1.5:
+                        bad_years.append(yr)
+                detail = (f'{game} χ²={chi2:.1f} (阈值 {dof*1.5:.0f})'
+                          + (f', 可疑年份 {",".join(bad_years)}' if bad_years
+                             else ', 各年均正常(疑似多重比较假阳性)'))
+                warn.append(detail)
 
+    ok = checked > 0 and not hard
+    parts = [f'体检 {checked} 个数据集']
+    if hard:
+        parts.append(f'{len(hard)} 个结构错误')
+    if warn:
+        parts.append(f'{len(warn)} 个统计警告')
+    if hard:
+        parts.append(hard[0])
+    elif warn:
+        parts.append(warn[0])
     return {
         'name': '数据质量',
-        'ok': checked > 0 and not issues,
-        'detail': f'体检 {checked} 个数据集, {len(issues)} 个问题' + (f': {issues[0]}' if issues else ''),
-        'fix': '' if not issues else '检查 data-raw/*.csv',
+        'ok': ok,
+        'detail': ', '.join(parts),
+        'fix': '' if ok else ('; '.join(hard)[:90]),
     }
 
 
@@ -235,6 +287,57 @@ def check_disk() -> Dict[str, Any]:
         return {'name': '磁盘空间', 'ok': True, 'detail': f'检测失败: {str(e)[:40]}', 'fix': ''}
 
 
+def check_data_guard() -> Dict[str, Any]:
+    """数据保护: 备份可用性 + 期数合理性 + 局部源风险"""
+    try:
+        from data.data_guard import (get_counts, list_backups,
+                                     check_sources, SOURCE_MIN_PERIODS)
+        counts = get_counts()
+        backups = list_backups()
+        issues = []
+
+        # 1. 库里有数据但没有备份 → 风险
+        total = sum(counts.values())
+        if total > 0 and not backups:
+            issues.append('有数据但无备份')
+
+        # 2. 各彩种期数低于主力源下界 → 可疑
+        for g, n in counts.items():
+            floor = SOURCE_MIN_PERIODS.get('gh', 0)
+            if floor and n < floor * 0.5:
+                issues.append(f'{g.upper()} 仅 {n} 期 (主力源应有 ≥{floor})')
+
+        # 3. 局部源覆盖风险 (按实际 crawl 的源组合判断: gh 在场 → 安全)
+        warns = check_sources(['gh', 'zhcw', 'ttz'], list(counts.keys()),
+                               existing_counts=counts)
+        partial = [w for w in warns if '局部源' in w]
+
+        # 4. 库内结构完整性 (重复期号 / 期号体系不一致 / 同日多期)
+        from data.data_guard import check_structure
+        struct = check_structure()
+        issues.extend(struct)
+
+        ok = not issues and not partial
+        detail_bits = [f'备份 {len(backups)} 份']
+        if counts:
+            detail_bits.append(', '.join(f'{k.upper()} {v}期'
+                                          for k, v in sorted(counts.items())))
+        if issues:
+            detail_bits.append('; '.join(issues))
+        if partial:
+            detail_bits.append(f'{len(partial)} 个局部源风险')
+
+        return {
+            'name': '数据保护',
+            'ok': ok,
+            'detail': ', '.join(detail_bits),
+            'fix': '' if ok else ('; '.join(issues + partial)[:80]),
+        }
+    except Exception as e:
+        return {'name': '数据保护', 'ok': True,
+                'detail': f'检测失败: {str(e)[:40]}', 'fix': ''}
+
+
 CHECKS = [
     check_python,
     check_dependencies,
@@ -245,6 +348,7 @@ CHECKS = [
     check_fetchers,
     check_reports,
     check_disk,
+    check_data_guard,
 ]
 
 

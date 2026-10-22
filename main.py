@@ -666,6 +666,12 @@ def cmd_crawl(args):
                 fn = getattr(mod, "collect", None)
                 if fn:
                     fn(g)
+            elif src == "gh":
+                # GitHub 开源数据集 (主力源, 提供全量历史 2937+3516 期)
+                mod = importlib.import_module("data.github_fetcher")
+                fn = getattr(mod, "collect", None) or getattr(mod, "fetch", None)
+                if fn:
+                    fn(g)
             else:
                 print(f"  跳过未知源: {src}")
 
@@ -676,10 +682,19 @@ def cmd_crawl(args):
             validate_merged(g, recs)
 
         if args.import_db:
-            from data.import_csv import import_sources, verify
-            print(f"\n--- 导入 SQLite ---")
-            n = import_sources(g, sources, verbose=True)
-            print(f"  合计 {n} 条")
+            from data.data_guard import guarded_import
+            print(f"\n--- 导入 SQLite (带数据保护) ---")
+            result = guarded_import(g, sources, verbose=True)
+            if not result.ok:
+                print(f"\n  ⚠️  {result.message}")
+                if not args.force:
+                    print(f"  已中止。确认要强制导入请加 --force")
+                    continue
+                print(f"  --force 已指定, 强制继续导入")
+                from data.import_csv import import_sources
+                import_sources(g, sources, verbose=True)
+
+            from data.import_csv import verify
             verify(g)
 
     print("\n完成。下一步: python run_lab.py <game> 或 python main.py analyze")
@@ -809,16 +824,18 @@ def main():
     p_health.add_argument("--watch", type=int, default=0, help="持续监控间隔（秒）")
     p_health.add_argument("--json", action="store_true", help="JSON 输出")
 
-    # crawl - 多源采集 (zhcw + ttz)
-    p_crawl = subparsers.add_parser("crawl", help="多源采集 + 合并 + 导入 SQLite")
+    # crawl - 多源采集 (gh 主力 + zhcw + ttz)
+    p_crawl = subparsers.add_parser("crawl", help="多源采集 + 合并 + 导入 SQLite (带数据保护)")
     p_crawl.add_argument("--game", type=str, default="all",
                          choices=["dlt", "ssq", "all"], help="彩种")
-    p_crawl.add_argument("--sources", type=str, default="zhcw,ttz",
-                         help="数据源 (逗号分隔: zhcw,ttz)")
+    p_crawl.add_argument("--sources", type=str, default="gh,zhcw,ttz",
+                         help="数据源 (逗号分隔: gh=GitHub主力全量, zhcw, ttz)")
     p_crawl.add_argument("--merge", action="store_true", default=True, help="合并多源")
     p_crawl.add_argument("--no-merge", dest="merge", action="store_false", help="跳过合并")
     p_crawl.add_argument("--import-db", action="store_true", default=True, help="导入 SQLite")
     p_crawl.add_argument("--no-import", dest="import_db", action="store_false", help="跳过导入")
+    p_crawl.add_argument("--force", action="store_true",
+                         help="守卫拦截时强制导入 (危险, 会覆盖全量历史)")
 
     # lab - 概率统计实验室 (12+1 步)
     p_lab = subparsers.add_parser("lab", help="跑 12+1 步概率统计实验室")

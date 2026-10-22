@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 def read_csv(path: Path, game: str) -> List[Dict]:
     """读 CSV → [{period, draw_date, front, back, prize_money, sales}]"""
+    from data.games import normalize_period
     cfg = get_game(game)
     fc, bc = cfg.front_count, cfg.back_count
 
@@ -44,6 +45,8 @@ def read_csv(path: Path, game: str) -> List[Dict]:
             period = str(row.get('period', '')).strip()
             if not period:
                 continue
+            # 统一期号格式 (gh 用 7 位, zhcw/ttz 用 5 位, 不统一会导致重复入库)
+            period = normalize_period(period, game)
             try:
                 front = sorted(int(row[f'front_{i+1}']) for i in range(fc))
                 back = sorted(int(row[f'back_{i+1}']) for i in range(bc))
@@ -81,17 +84,31 @@ def read_csv(path: Path, game: str) -> List[Dict]:
 
 
 def import_sources(game: str, sources: List[str], verbose: bool = True,
-                   purge: bool = False) -> int:
+                   purge: bool = False,
+                   prefer: List[str] = None) -> int:
     """
-    导入多个源 (后者覆盖前者, merged 优先)
+    导入多个源 (默认按 prefer 优先级, 靠后的源只补缺不覆盖)
 
     ⚠ 默认 **不清空** 数据库, 走 upsert。
-    历史教训: 早期版本先 DELETE 再导入, 导致 GitHub 全量历史 (3037+3516 期)
-    被 zhcw/ttz 的 100 期局部数据整体覆盖, 期数从 6553 掉到 402。
+    历史教训 (2026-10-22): 早期版本先 DELETE 再导入, 导致 GitHub 全量历史
+    (3037+3516 期) 被 zhcw/ttz 的 100 期局部数据整体覆盖, 期数从 6553 掉到 402。
     只有显式 purge=True 才清空 (用于重建库)。
+
+    ⚠ **源优先级** (2026-10-22 第二次事故):
+      各源期号体系不一致 (gh 用 7 位 YYYY+期序, zhcw/ttz 用 5 位 YY+期序),
+      且 ttz 的开奖日期整体偏移 1 天。若无脑 upsert, 后导入的局部源会污染
+      主力源的全量数据 (实测: 68 期重复入库 + 前区 χ² 从 ~48 飙到 90)。
+      规则: prefer 里的源优先写入, 其余源 **只补缺, 不覆盖**。
     """
     storage = SQLiteStorage(db_path=str(DB_PATH))
     total = 0
+
+    # 源优先级: prefer 在前, 其余按 sources 原序
+    ordered = list(sources)
+    if prefer:
+        ordered = ([s for s in prefer if s in sources]
+                   + [s for s in sources if s not in prefer])
+    primary = ordered[0] if ordered else None
 
     if purge:
         with storage._connect() as conn:
@@ -105,8 +122,22 @@ def import_sources(game: str, sources: List[str], verbose: bool = True,
             existing = conn.execute(
                 'SELECT COUNT(*) FROM draws WHERE game=?', (game,)).fetchone()[0]
         print(f'  [upsert] 保留现有 {existing} 条, 增量写入')
+        if len(ordered) > 1:
+            print(f'  [priority] 源优先级: {" > ".join(ordered)}'
+                  f'  (靠后的源只补缺, 不覆盖)')
 
-    for src in sources:
+    # 已入库的 (期号集合, 号码组合集合), 用于冲突检测
+    existing_periods = set()
+    existing_numbers = set()
+    if not purge:
+        with storage._connect() as conn:
+            for period, fn in conn.execute(
+                    'SELECT period, front_numbers FROM draws WHERE game=?', (game,)):
+                existing_periods.add(str(period))
+                if fn:
+                    existing_numbers.add(str(fn))
+
+    for src in ordered:
         path = DATA_RAW / f'{src}_{game}.csv'
         recs = read_csv(path, game)
         if not recs:
@@ -119,6 +150,28 @@ def import_sources(game: str, sources: List[str], verbose: bool = True,
             if not r['draw_date']:
                 r['draw_date'] = _synthesize_date(game, r['period'])
             r['notes'] = src
+
+        # --- 冲突过滤: 非主力源只补缺 ---
+        if src != primary:
+            filtered = []
+            skipped_dup = skipped_conflict = 0
+            for r in recs:
+                num_key = str(r['front'])
+                if r['period'] in existing_periods:
+                    skipped_dup += 1
+                    continue
+                if num_key and num_key in existing_numbers:
+                    # 期号不同但号码组合相同 → 该源期号体系与主力源不一致
+                    skipped_conflict += 1
+                    continue
+                filtered.append(r)
+            if verbose and (skipped_dup or skipped_conflict):
+                msg = f'  {src}: 跳过 {skipped_dup} 期重复期号'
+                if skipped_conflict:
+                    msg += (f' + {skipped_conflict} 同期号不同期号'
+                            f'(该源期号体系与主力源不一致)')
+                print(msg)
+            recs = filtered
 
         draws = [
             Draw(
@@ -136,8 +189,11 @@ def import_sources(game: str, sources: List[str], verbose: bool = True,
         n = storage.save_draws(draws)
         total += n
         if verbose:
-            with_date = sum(1 for r in recs if r['draw_date'] and not r['draw_date'].startswith('20') is None)
             print(f'  {src}: 导入 {n} 条 ({path.name})')
+
+        for r in recs:
+            existing_periods.add(str(r['period']))
+            existing_numbers.add(str(r['front']))
 
     return total
 

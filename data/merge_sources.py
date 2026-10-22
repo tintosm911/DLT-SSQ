@@ -32,6 +32,7 @@ GAMES = {
 
 
 def read_csv(path: Path, game: str) -> List[Dict]:
+    from data.games import normalize_period
     cfg = GAMES[game]
     if not path.exists():
         return []
@@ -44,7 +45,8 @@ def read_csv(path: Path, game: str) -> List[Dict]:
             except (KeyError, ValueError):
                 continue
             out.append({
-                'period': row['period'].strip(),
+                # 统一期号 (gh 7 位 vs zhcw/ttz 5 位), 否则同期开奖会被当成两期
+                'period': normalize_period(row['period'].strip(), game),
                 'draw_date': row.get('draw_date', '').strip(),
                 'front': sorted(front),
                 'back': sorted(back),

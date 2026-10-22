@@ -129,3 +129,54 @@ def get_prize_rules(code: str = None):
     """获取奖级规则"""
     code = code or "dlt"
     return PRIZE_RULES.get(code, [])
+
+
+# ============================================================
+# 期号规范化 (2026-10-22 新增)
+# ============================================================
+# 历史问题: 不同数据源的期号格式不一致
+#   GitHub 源 (gh)      → 7 位 "2026120"  (YYYY + 3位期序)
+#   中彩网/天天走势 源   → 5 位 "26120"    (YY + 3位期序)
+# 同一期开奖因字符串不同被当成两条记录, 导致:
+#   - UNIQUE(period, game) 约束失效
+#   - 68 期重复入库
+#   - 前区频次 χ² 从 ~48 飙到 87.9 (超阈值)
+#
+# 规范: 统一成 7 位 YYYY + 3位期序
+PERIOD_DIGITS = 7
+
+
+def normalize_period(period, code: str = None) -> str:
+    """
+    把任意格式的期号规范成 7 位 YYYY+期序。
+
+    >>> normalize_period('26120')
+    '2026120'
+    >>> normalize_period('2026120')
+    '2026120'
+    >>> normalize_period('2026120', 'ssq')
+    '2026120'
+    """
+    s = str(period).strip()
+    if not s:
+        return s
+    # 去掉可能存在的分隔符
+    s = s.replace('-', '').replace('_', '').replace('.', '')
+
+    # 已是 7 位
+    if len(s) == PERIOD_DIGITS:
+        return s
+    # 5 位: YYnnn → 20YYnnn
+    if len(s) == 5 and s.isdigit():
+        return '20' + s
+    # 6 位: 20YYnn 之类, 尝试补期序
+    if len(s) == 6 and s.isdigit():
+        return s + '0'
+    # 其他长度: 原样返回 (可能是未来的新格式)
+    return s
+
+
+def period_sort_key(period):
+    """期号排序键 (统一格式后按数值排)"""
+    s = str(period).strip()
+    return (0, int(s)) if s.isdigit() else (1, s)
