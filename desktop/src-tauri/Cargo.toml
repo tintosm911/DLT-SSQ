@@ -1,0 +1,30 @@
+﻿[package]
+name = "lottery-desktop"
+version = "1.0.0"
+description = "China Lottery Analysis Tool - Desktop"
+authors = ["lottery-lab"]
+edition = "2021"
+# NOTE: local rustc is 1.88; tauri-utils 2.8+ requires rustc 1.90.
+#   Pinned below to stay compatible without upgrading the toolchain
+#   (which would also affect the DrawScope build).
+rust-version = "1.77"
+
+[lib]
+name = "lottery_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.3.0", features = [] }
+
+[dependencies]
+tauri = { version = "=2.6.2", features = [] }
+# Pinned: tauri-utils 2.8+ needs rustc 1.90, uuid 1.28 needs 1.89.
+#   Without these pins cargo resolves to latest and the build fails.
+tauri-utils = "=2.6.0"
+uuid = { version = "=1.11.0", features = ["v4"] }
+tauri-plugin-shell = "=2.0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

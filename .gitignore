@@ -66,3 +66,15 @@ htmlcov/
 # 笔记草稿
 docs/.drafts/
 *.tmp~
+
+# ====== Desktop (Tauri) ======
+# 只排除构建产物, 源码要进版本库
+node_modules/
+desktop/node_modules/
+desktop/dist/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+desktop/src-tauri/Cargo.lock
+
+# 竞彩赔率快照 (运行时数据, 可重新抓取)
+data-raw/odds_snapshots.db

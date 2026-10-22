@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>中国彩票分析工具</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0f172a; }
+  body { display: flex; align-items: center; justify-content: center;
+         font-family: -apple-system, "Microsoft YaHei", system-ui, sans-serif;
+         color: #e2e8f0; }
+  .box { text-align: center; }
+  .spin { width: 42px; height: 42px; margin: 0 auto 20px;
+          border: 3px solid #1e293b; border-top-color: #f59e0b;
+          border-radius: 50%; animation: s 0.9s linear infinite; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 8px; }
+  p { font-size: 13px; color: #64748b; margin: 0; }
+  .err { color: #f87171; font-size: 13px; max-width: 460px;
+         line-height: 1.7; text-align: left; }
+  code { background: #1e293b; padding: 2px 6px; border-radius: 3px;
+         color: #fbbf24; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="spin" id="spin"></div>
+    <h1>正在启动分析后端…</h1>
+    <p id="msg">首次启动需要几秒 (加载 Python 依赖)</p>
+  </div>
+<script>
+  // Tauri 启动后端并返回 URL, 这里负责跳转 + 兜底
+  const { invoke } = window.__TAURI__ ? window.__TAURI__ : {};
+  async function boot() {
+    try {
+      if (invoke) {
+        const info = await invoke('backend_info');
+        window.location.href = info.url;
+      } else {
+        // 纯浏览器模式 (npm run dev 调试用)
+        window.location.href = 'http://127.0.0.1:9876/';
+      }
+    } catch (e) {
+      document.getElementById('spin').style.display = 'none';
+      document.querySelector('h1').textContent = '后端启动失败';
+      document.getElementById('msg').innerHTML =
+        '<div class="err">' + (e || '未知错误') +
+        '<br><br>请确认已安装 Python 3.10+ 并安装依赖:<br><code>pip install -r requirements-ci.txt</code></div>';
+    }
+  }
+  boot();
+  setTimeout(() => {
+    const m = document.getElementById('msg');
+    if (m && m.textContent.includes('首次启动')) {
+      m.textContent = '仍在等待后端… (首次启动可能需要 10-20 秒)';
+    }
+  }, 6000);
+</script>
+</body>
+</html>
