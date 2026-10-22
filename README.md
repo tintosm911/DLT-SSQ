@@ -141,6 +141,47 @@ python scripts/make_jingcai_chart.py      # 重新生成对比图
 > 当前用真实历史赔率做等价测算。要做实时双向扫描需接
 > [the-odds-api.com](https://the-odds-api.com)（免费 500 次/月，需注册 key）。
 
+### ⚡ 实时扫描 (Web Tab ⑧)
+
+接入 [the-odds-api.com](https://the-odds-api.com) 后，可做**当下**的跨市场扫描：
+
+```bash
+# 首次: 配好 key (环境变量或项目根 .odds_api_key 文件)
+$env:ODDS_API_KEY = 'your_key_here'
+python scripts\live_scanner.py
+```
+
+**实测 (2026-10-22 22:10 CST, uk+eu+au 三区)**:
+
+| | 抽水率 |
+|---|---|
+| **中国竞彩** | **12.90%** |
+| matchbook (交易所) | 0.90% |
+| betfair_ex (uk/au/eu) | 0.95% ~ 0.96% |
+| smarkets | 1.51% |
+| Pinnacle | 3.98% |
+
+**竞彩 24 场 / 境外 195 场 / 配对 18 组 / 每场 28~42 家博彩公司**
+
+| 场次 | 套利组合 | 锁定 |
+|---|---|---|
+| 欧协联 阿贾克斯 vs 亚特兰大 | unibet_nl / betfair_ex_au / matchbook | **1.425%** |
+| 欧罗巴 波兹南 vs 桑德兰 | unibet_se / unibet_nl / smarkets | 0.568% |
+| 欧罗巴 霍芬海姆 vs 里昂 | marathonbet / smarkets / betfair_ex_uk | 0.557% |
+
+**配对算法**: 竞彩 3 字母码的字母按顺序出现在境外队名中
+（`SGZ`←SK Sturm Graz，`DNZ`←Dinamo Zagreb，`CVO`←Celta Vigo，`AJX`←Ajax）
++ 同联赛 + 开赛时间差 < 36h + 唯一性占用。配对率 **18/24**。
+
+> ⚠️ **再次强调**: 所有 6 场套利里，**竞彩一次都没参与**。
+> 它的 12.90% 抽水会拉高 Σ(1/odds)，只会让组合更难满足套利条件。
+> 跨市场套利这条路，竞彩走不通 —— 但**在竞彩下注就意味着接受 12.90% 的抽水**。
+
+```bash
+# 网络差时用 GitHub API 推送 (绕过被挡的 git 协议)
+python scripts/push_via_api.py --token ghp_xxx
+```
+
 一个端到端的中国彩种分析平台, 集成:
 - **号码彩**: 大乐透 / 双色球 (历史数据 6500+ 期, 含真实开奖日期)
 - **竞彩**: Elo + Value Bet + 凯利仓位 + 组合优化
