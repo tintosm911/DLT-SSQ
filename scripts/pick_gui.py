@@ -143,7 +143,8 @@ INDEX_HTML = """
     <button class="tab" data-tab="settle">⑤ 快速算账</button>
     <button class="tab" data-tab="hot">⑥ 热号幻觉</button>
     <button class="tab" data-tab="sports">⑦ 竞彩分析</button>
-    <button class="tab" data-tab="history">⑧ 历史记录</button>
+    <button class="tab" data-tab="live">⑧ 实时扫描</button>
+    <button class="tab" data-tab="history">⑨ 历史记录</button>
   </div>
 
   <!-- Tab 1: check -->
@@ -352,7 +353,28 @@ INDEX_HTML = """
     <div class="result" id="sp-result">选好联赛后点"开始分析" (每个联赛约 10-30 秒)</div>
   </div>
 
-  <!-- Tab 8: history -->
+  <!-- Tab 8: 实时扫描 -->
+  <div class="panel hidden" id="panel-live">
+    <div class="row">
+      <label>最小套利利润:</label>
+      <select id="ls-minprofit">
+        <option value="0" selected>0% (任何正套利)</option>
+        <option value="0.2">0.2%</option>
+        <option value="0.5">0.5%</option>
+        <option value="1">1%</option>
+      </select>
+      <button onclick="lsRun(false)">扫描 (用缓存)</button>
+      <button class="secondary" onclick="lsRun(true)">强制刷新 (耗 API 配额)</button>
+      <span id="ls-status" style="font-size:12px;color:#94a3b8"></span>
+    </div>
+    <div class="dt-hint">
+      中国竞彩官方实时赔率 (webapi.sporttery.cn) × 境外 40+ 家博彩公司实时盘口 (the-odds-api.com)。
+      每次强制刷新约消耗 15 次 API 配额 (免费额度 500 次/月)。
+    </div>
+    <div class="result" id="ls-result">点"扫描"开始 (首次约 10-20 秒)</div>
+  </div>
+
+  <!-- Tab 9: history -->
   <div class="panel hidden" id="panel-history">
     <div class="stats" id="history-stats"></div>
     <table class="history-table" id="history-table">
@@ -1228,6 +1250,136 @@ function spRenderJingcai(j) {
   return h;
 }
 
+// ============================================================
+// Tab 8: 实时扫描 (竞彩 × 境外多公司)
+// ============================================================
+async function lsRun(refresh) {
+  const status = document.getElementById('ls-status');
+  status.textContent = refresh ? '拉取实时赔率中 (约 10-20 秒)...' : '读取缓存...';
+  document.getElementById('ls-result').innerHTML = '扫描中, 请稍候...';
+  const t0 = Date.now();
+  try {
+    const r = await api('live-scan', {
+      min_profit: parseFloat(document.getElementById('ls-minprofit').value),
+      refresh: refresh,
+    });
+    const dt = ((Date.now() - t0) / 1000).toFixed(1);
+    if (!r.ok) {
+      status.textContent = '';
+      document.getElementById('ls-result').innerHTML =
+        `<span class="alert">${r.error}</span>`;
+      return;
+    }
+    status.textContent = `✓ 完成 (${dt}s)${r.from_cache ? ' [缓存]' : ''}`;
+    document.getElementById('ls-result').innerHTML = lsRender(r);
+  } catch (e) {
+    status.textContent = '';
+    document.getElementById('ls-result').innerHTML =
+      `<span class="alert">错误: ${e.message}</span>`;
+  }
+}
+
+function lsRender(r) {
+  let h = '';
+  h += `<b>实时双向扫描</b> · ${r.scan_time ? r.scan_time.slice(0, 19).replace('T', ' ') : ''} UTC`
+     + `${r.from_cache ? ` (缓存 ${r.cache_age_sec}s 前)` : ''}<br>`;
+  h += `竞彩 <b>${r.n_jc}</b> 场 · 境外 <b>${r.n_ov}</b> 场 · `
+     + `配对 <b>${r.n_paired}</b> 组 · 可套利 <b class="${r.n_with_arb ? 'hit' : ''}">`
+     + `${r.n_with_arb}</b> 场<br><br>`;
+
+  h += `<b style="color:#fbbf24">【1】抽水率对比 (同一场比赛, 同一时刻)</b><br>`;
+  h += `<div class="card-grid">`;
+  h += `<div class="mini-card"><div class="lbl">中国竞彩</div>`
+     + `<div class="val neg">${(r.jc_vig_mean * 100).toFixed(2)}%</div></div>`;
+  const bv = r.book_vig_mean || {};
+  const bestB = r.book_vig_best;
+  if (bestB) {
+    h += `<div class="mini-card"><div class="lbl">境外最优 ${bestB[0]}</div>`
+       + `<div class="val pos">${(bestB[1] * 100).toFixed(2)}%</div></div>`;
+    h += `<div class="mini-card"><div class="lbl">价差</div>`
+       + `<div class="val">${((r.jc_vig_mean - bestB[1]) * 100).toFixed(2)}pp</div></div>`;
+  }
+  h += `<div class="mini-card"><div class="lbl">可套利场次</div>`
+     + `<div class="val ${r.n_with_arb ? 'hit' : ''}">${r.n_with_arb}</div></div>`;
+  h += `</div><br>`;
+
+  const entries = Object.entries(bv).sort((a, b) => a[1] - b[1]).slice(0, 10);
+  if (entries.length) {
+    h += `<table style="width:100%;border-collapse:collapse;font-size:12px">`;
+    h += `<tr style="background:#0f1728">`
+       + `<th style="padding:3px;text-align:left">博彩公司</th>`
+       + `<th style="padding:3px;text-align:right">平均抽水%</th></tr>`;
+    for (const [b, v] of entries) {
+      h += `<tr style="border-bottom:1px solid #1e293b">`
+         + `<td style="padding:2px">${b}</td>`
+         + `<td style="padding:2px;text-align:right">${(v * 100).toFixed(2)}</td></tr>`;
+    }
+    h += `</table><br>`;
+  }
+
+  if (r.best_arb) {
+    const a = r.best_arb, m = a.match;
+    h += `<b style="color:#fbbf24">【2】最佳套利机会</b><br>`;
+    h += `<b>${m.league}</b> ${m.date} ${m.time} — ${m.home} vs ${m.away}<br>`;
+    h += `<span style="color:#64748b">${m.ov_event} · ${(m.ov_commence || '').slice(11, 16)} UTC</span><br>`;
+    h += `竞彩: ${m.jc_odds.map(x => x.toFixed(2)).join(' / ')} `
+       + `<span class="miss">(抽水 ${(m.jc_vig * 100).toFixed(2)}%)</span><br>`;
+    h += `组合: 主 <b>${a.books[0]}</b> ${a.odds[0].toFixed(2)} / `
+       + `平 <b>${a.books[1]}</b> ${a.odds[1].toFixed(2)} / `
+       + `客 <b>${a.books[2]}</b> ${a.odds[2].toFixed(2)}<br>`;
+    h += `Σ(1/o) = <b>${a.sum_inv.toFixed(6)}</b> → 锁定 `
+       + `<b class="hit">${a.profit_pct.toFixed(3)}%</b><br>`;
+    h += `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px">`;
+    h += `<tr style="background:#0f1728">`
+       + `<th style="padding:3px;text-align:left">下注方</th>`
+       + `<th style="padding:3px;text-align:right">投入</th>`
+       + `<th style="padding:3px;text-align:right">中则返</th></tr>`;
+    a.books.forEach((bk, i) => {
+      const st = a.stakes && a.stakes[i];
+      h += `<tr style="border-bottom:1px solid #1e293b">`
+         + `<td style="padding:2px">${bk}${bk === '竞彩' ? ' [竞彩]' : ''}</td>`
+         + `<td style="padding:2px;text-align:right">${st ? st.stake.toFixed(2) : '-'}</td>`
+         + `<td style="padding:2px;text-align:right">${st ? st.payout.toFixed(2) : '-'}</td></tr>`;
+    });
+    h += `</table><br>`;
+  } else {
+    h += `<b style="color:#fbbf24">【2】套利机会</b><br>`;
+    h += `<span class="miss">当前扫描未发现跨市场套利机会</span><br><br>`;
+  }
+
+  h += `<b style="color:#fbbf24">【3】逐场明细</b><br>`;
+  h += `<table style="width:100%;border-collapse:collapse;font-size:11px">`;
+  h += `<tr style="background:#0f1728">`
+     + `<th style="padding:3px;text-align:left">联赛</th>`
+     + `<th style="padding:3px;text-align:left">对阵</th>`
+     + `<th style="padding:3px;text-align:right">竞彩 胜/平/负</th>`
+     + `<th style="padding:3px;text-align:right">竞彩抽水</th>`
+     + `<th style="padding:3px;text-align:left">境外最优</th>`
+     + `<th style="padding:3px;text-align:right">抽水</th>`
+     + `<th style="padding:3px;text-align:right">公司数</th>`
+     + `<th style="padding:3px;text-align:right">套利</th></tr>`;
+  for (const m of r.matches) {
+    const arb = m.arbs && m.arbs[0];
+    h += `<tr style="border-bottom:1px solid #1e293b">`
+       + `<td style="padding:2px">${m.league}</td>`
+       + `<td style="padding:2px">${m.home}vs${m.away}</td>`
+       + `<td style="padding:2px;text-align:right">${m.jc_odds.map(x => x.toFixed(2)).join('/')}</td>`
+       + `<td style="padding:2px;text-align:right" class="miss">${(m.jc_vig * 100).toFixed(2)}</td>`
+       + `<td style="padding:2px">${m.best_book || '-'}</td>`
+       + `<td style="padding:2px;text-align:right" class="hit">${((m.best_book_vig || 0) * 100).toFixed(2)}</td>`
+       + `<td style="padding:2px;text-align:right">${m.n_books}</td>`
+       + `<td style="padding:2px;text-align:right" class="${arb ? 'hit' : ''}">`
+       + `${arb ? arb.profit_pct.toFixed(2) + '%' : '-'}</td></tr>`;
+  }
+  h += `</table><br>`;
+  h += `<div class="disclaimer">`;
+  h += `<b>注意:</b> 竞彩抽水 ~12.9% vs 境外交易所 ~0.75% — 同一市场抽水差 17 倍. `
+     + `套利机会通常只有 0.1%~0.6%, 且需要境外 (交易所) 账户才能执行. `;
+  h += `而"竞彩 + 境外"的组合里, 竞彩一次都用不上 — 它的抽水太高, 会拉高 Σ(1/odds).`;
+  h += `</div>`;
+  return h;
+}
+
 // 切换彩种时重建网格
 document.getElementById('check-game').addEventListener('change', buildGrids);
 document.getElementById('score-game').addEventListener('change', buildGrids);
@@ -1687,6 +1839,31 @@ def api_jingcai_live():
         import traceback
         traceback.print_exc()
         return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/live-scan', methods=['POST'])
+def api_live_scan():
+    """
+    实时双向扫描 (Tab ⑧): 中国竞彩 × 境外多公司
+    body: {min_profit, refresh}
+    """
+    try:
+        from data.live_scan_service import run_scan, summarize, has_key
+        if not has_key():
+            return jsonify({
+                'ok': False,
+                'error': '未配置 the-odds-api key. 设 ODDS_API_KEY 环境变量, '
+                         '或在项目根放 .odds_api_key 文件 (内容为 key).'
+            }), 400
+        body = request.get_json() or {}
+        min_profit = float(body.get('min_profit', 0.0))
+        refresh = bool(body.get('refresh', False))
+        r = run_scan(min_profit=min_profit, use_cache=not refresh)
+        return jsonify(_jsonable(summarize(r)))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': f'{type(e).__name__}: {e}'}), 500
 
 
 @app.route('/api/games')
