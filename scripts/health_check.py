@@ -338,6 +338,24 @@ def check_data_guard() -> Dict[str, Any]:
                 'detail': f'检测失败: {str(e)[:40]}', 'fix': ''}
 
 
+def check_corrupt_files() -> Dict[str, Any]:
+    """检测内容大面积 null bytes 的损坏文件 (2026-10-22 发现过 19 个)"""
+    try:
+        from scripts.check_corrupt import scan
+        bad = scan()
+        return {
+            'name': '文件完整性',
+            'ok': not bad,
+            'detail': (f'✅ 未发现损坏文件' if not bad
+                        else f'❌ {len(bad)} 个文件内容为 null bytes: '
+                             + ', '.join(p.name for p in bad[:5])),
+            'fix': '' if not bad else 'python scripts/check_corrupt.py --fix-git',
+        }
+    except Exception as e:
+        return {'name': '文件完整性', 'ok': True,
+                'detail': f'检测失败: {str(e)[:40]}', 'fix': ''}
+
+
 CHECKS = [
     check_python,
     check_dependencies,
@@ -349,6 +367,7 @@ CHECKS = [
     check_reports,
     check_disk,
     check_data_guard,
+    check_corrupt_files,
 ]
 
 
