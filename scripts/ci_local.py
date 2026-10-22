@@ -55,6 +55,7 @@ def run_checks(quick: bool = False) -> list:
     checks = [
         Check('单元测试', [py, 'tests/test_pick_advisor.py'], '核心库 8 个用例'),
         Check('胆拖精确求解器', [py, 'tests/test_dan_tuo_exact.py'], '5 个性质验证'),
+        Check('胆拖方案对比', [py, 'scripts/dantuo_final_compare.py'], '统一口径 7 方案'),
         Check('奖级一致性', [py, 'scripts/check_prize_consistency.py'],
               'PRIZE_RULES vs judge_prize'),
         Check('数据守卫测试', [py, 'tests/test_data_guard.py'], '故障注入 22 个用例'),

@@ -296,6 +296,7 @@ python smoke_test.py
 │   ├── analyze_dantuo.py    ★ 胆拖深度分析 (精确超几何, 零抽样误差)
 │   ├── compare_dantuo_schemes.py  7 组胆拖结构横向对比
 │   ├── dantuo_structure_matrix.py  胆码数量结构矩阵
+│   ├── dantuo_final_compare.py     7 组方案统一口径对比
 │   ├── check_prize_consistency.py   奖级表 vs 判奖逻辑一致性
 │   ├── demo_e2e.py          ★ ④ 端到端诚实演示
 │   ├── health_check.py       11 项健康检查 (可自动修复)
