@@ -58,6 +58,8 @@ def run_checks(quick: bool = False) -> list:
         Check('胆拖方案对比', [py, 'scripts/dantuo_final_compare.py'], '统一口径 7 方案'),
         Check('奖级一致性', [py, 'scripts/check_prize_consistency.py'],
               'PRIZE_RULES vs judge_prize'),
+        Check('数据完整性审计', [py, 'scripts/audit_data_integrity.py'],
+              '期号连续性 + 日期间隔'),
         Check('数据守卫测试', [py, 'tests/test_data_guard.py'], '故障注入 22 个用例'),
         Check('文件完整性', [py, 'scripts/check_corrupt.py'], 'null bytes 损坏检测'),
         Check('健康检查', [py, 'scripts/health_check.py'], '11 项'),

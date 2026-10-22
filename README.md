@@ -286,6 +286,9 @@ python scripts/dantuo_structure_matrix.py  # 胆码数量结构矩阵
 python scripts/dantuo_final_compare.py    # 统一口径最终对比
 ```
 
+> 📄 **完整推导**见 [`docs/dan_tuo_theory.md`](docs/dan_tuo_theory.md) ——
+> 含超几何全枚举的完整证明、结构矩阵、两个被交叉验证抓出的真实 bug。
+
 ## 🏗️ 项目架构
 
 ```
@@ -338,6 +341,12 @@ python scripts/dantuo_final_compare.py    # 统一口径最终对比
 │   ├── ttz_*.csv          天天走势 100 期 (2026)
 │   ├── zhcw_*.csv         中彩网 100 期 (2020, 含真实日期)
 │   └── lottery.db         SQLite (2938 + 3517 期)
+│
+├── docs/                设计与理论文档
+│   ├── README.md           文档索引
+│   ├── dan_tuo_theory.md   ★ 胆拖结构理论 (超几何完整推导)
+│   ├── prize_rules_spec.md ★ 奖级规则规范 (唯一真相源)
+│   └── data_audit.md       数据完整性审计报告
 │
 ├── reports/              生成的可视化图表 (PNG)
 └── tests/                pytest 单元测试 (21 个)
