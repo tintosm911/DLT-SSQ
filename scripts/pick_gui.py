@@ -141,7 +141,8 @@ INDEX_HTML = """
     <button class="tab" data-tab="dantuo">③ 胆拖分析</button>
     <button class="tab" data-tab="strategy">④ 预测玩法回测</button>
     <button class="tab" data-tab="settle">⑤ 快速算账</button>
-    <button class="tab" data-tab="history">⑥ 历史记录</button>
+    <button class="tab" data-tab="hot">⑥ 热号幻觉</button>
+    <button class="tab" data-tab="history">⑦ 历史记录</button>
   </div>
 
   <!-- Tab 1: check -->
@@ -293,7 +294,41 @@ INDEX_HTML = """
     <div class="result" id="qs-result">填入金额后点"算账"</div>
   </div>
 
-  <!-- Tab 6: history -->
+  <!-- Tab 6: 热号幻觉 -->
+  <div class="panel hidden" id="panel-hot">
+    <div class="row">
+      <label>彩种:</label>
+      <select id="hi-game" onchange="hiYears()">
+        <option value="dlt">大乐透</option>
+        <option value="ssq">双色球</option>
+      </select>
+      <label>训练期:</label>
+      <select id="hi-train"></select>
+      <label>测试期:</label>
+      <select id="hi-test"></select>
+      <label>Top-K:</label>
+      <select id="hi-topk">
+        <option value="5">5</option>
+        <option value="8">8</option>
+        <option value="10" selected>10</option>
+        <option value="15">15</option>
+      </select>
+      <label>每期买:</label>
+      <select id="hi-pick">
+        <option value="3">3 个</option>
+        <option value="5" selected>5 个</option>
+        <option value="6">6 个</option>
+      </select>
+      <button onclick="hiRun()">分析</button>
+      <span id="hi-status" style="font-size:12px;color:#94a3b8"></span>
+    </div>
+    <div class="dt-hint">
+      用训练期的"热号排名"去预测测试期, 每一项都跟随机期望对比 (z 分数), 并扫描所有年份切分验证结论是否稳定。
+    </div>
+    <div class="result" id="hi-result">选好训练期和测试期后点"分析"</div>
+  </div>
+
+  <!-- Tab 7: history -->
   <div class="panel hidden" id="panel-history">
     <div class="stats" id="history-stats"></div>
     <table class="history-table" id="history-table">
@@ -789,6 +824,183 @@ async function qsCalc() {
   }
 }
 
+// ============================================================
+// Tab 6: 热号幻觉
+// ============================================================
+let hiYearsCache = {};
+
+async function hiYears() {
+  const game = document.getElementById('hi-game').value;
+  const status = document.getElementById('hi-status');
+  if (!hiYearsCache[game]) {
+    status.textContent = '加载年份...';
+    try {
+      const r = await fetch('/api/games');
+      const j = await r.json();
+      hiYearsCache[game] = j.years || [];
+    } catch (e) {
+      hiYearsCache[game] = [];
+    }
+  }
+  const years = hiYearsCache[game];
+  const tr = document.getElementById('hi-train');
+  const te = document.getElementById('hi-test');
+  const opts = (sel, defaultIdx) => {
+    sel.innerHTML = '';
+    years.forEach((y, i) => {
+      const o = document.createElement('option');
+      o.value = y; o.textContent = y;
+      if (i === defaultIdx) o.selected = true;
+      sel.appendChild(o);
+    });
+  };
+  // 训练期默认最近 5 年里的前 3 年, 测试期最后 2 年
+  if (years.length >= 5) {
+    opts(tr, years.length - 5);
+    opts(te, years.length - 2);
+    tr.value = years[years.length - 5];
+    te.value = years[years.length - 2];
+  } else {
+    opts(tr, 0); opts(te, 0);
+  }
+  status.textContent = '';
+}
+
+async function hiRun() {
+  const status = document.getElementById('hi-status');
+  const game = document.getElementById('hi-game').value;
+  const trainYear = document.getElementById('hi-train').value;
+  const testYear = document.getElementById('hi-test').value;
+  if (!trainYear || !testYear) {
+    document.getElementById('hi-result').innerHTML =
+      '<span class="alert">请先加载年份</span>';
+    return;
+  }
+  status.textContent = '分析中...';
+  const t0 = Date.now();
+  try {
+    // 训练期 = 从 trainYear 起连续 3 年, 测试期 = 从 testYear 起连续 2 年
+    const all = hiYearsCache[game] || [];
+    const ti = all.indexOf(trainYear);
+    const ei = all.indexOf(testYear);
+    const train = all.slice(ti, ti + 3);
+    const test = all.slice(ei, ei + 2);
+    const r = await api('hot-illusion', {
+      game: game,
+      train_years: train,
+      test_years: test,
+      top_k: parseInt(document.getElementById('hi-topk').value),
+      pick_n: parseInt(document.getElementById('hi-pick').value),
+    });
+    const dt = ((Date.now() - t0) / 1000).toFixed(1);
+    status.textContent = `✓ 完成 (${dt}s)`;
+    document.getElementById('hi-result').innerHTML = hiRender(r);
+  } catch (e) {
+    status.textContent = '';
+    document.getElementById('hi-result').innerHTML =
+      `<span class="alert">错误: ${e.message}</span>`;
+  }
+}
+
+function hiRender(r) {
+  const p = r.predictive, c = r.continuity, s = r.scan;
+  let h = '';
+
+  h += `<b>${r.game_name} 热号幻觉检验</b><br>`;
+  h += `<span style="color:#64748b">训练期 ${p.train_years[0]}-${p.train_years[p.train_years.length-1]} `
+       + `(${p.train_draws} 期) → 测试期 ${p.test_years[0]}-${p.test_years[p.test_years.length-1]} `
+       + `(${p.test_draws} 期)</span><br><br>`;
+
+  // 1. 热号表现表
+  h += `<b style="color:#fbbf24">【1】训练期热号在测试期的真实表现】</b><br>`;
+  h += `<table style="width:100%;border-collapse:collapse;font-size:12px">`;
+  h += `<tr style="background:#0f1728">`
+     + `<th style="padding:4px;text-align:left">号码</th>`
+     + `<th style="padding:4px;text-align:right">训练次数</th>`
+     + `<th style="padding:4px;text-align:right">测试出现</th>`
+     + `<th style="padding:4px;text-align:right">随机期望</th>`
+     + `<th style="padding:4px;text-align:right">z 分数</th>`
+     + `<th style="padding:4px;text-align:left">判定</th></tr>`;
+  for (const x of p.per_num) {
+    const zc = Math.abs(x.z) >= 2 ? (x.z > 0 ? 'hit' : 'miss') : '';
+    const judge = Math.abs(x.z) >= 2
+      ? (x.z > 0 ? '显著高于随机' : '显著低于随机')
+      : (x.above ? '略高于随机(不显著)' : '略低于随机(不显著)');
+    h += `<tr style="border-bottom:1px solid #1e293b">`
+       + `<td style="padding:3px"><b>${x.num}</b></td>`
+       + `<td style="padding:3px;text-align:right">${x.train_count}</td>`
+       + `<td style="padding:3px;text-align:right">${x.test_count}</td>`
+       + `<td style="padding:3px;text-align:right;color:#64748b">${x.expected}</td>`
+       + `<td style="padding:3px;text-align:right" class="${zc}">${x.z > 0 ? '+' : ''}${x.z}</td>`
+       + `<td style="padding:3px;font-size:11px;color:#94a3b8">${judge}</td></tr>`;
+  }
+  h += `</table>`;
+  h += `热号平均出现 <b>${p.hot_avg_count}</b> 次 vs 随机期望 <b>${p.hot_expected}</b> 次 `
+     + `(z=${p.hot_z > 0 ? '+' : ''}${p.hot_z})<br><br>`;
+
+  // 2. 预测力检验
+  h += `<b style="color:#fbbf24">【2】预测力检验 (每期都买 Top-${p.pick_set.length} 热号)</b><br>`;
+  h += `买入号码: <b>${p.pick_set.join(', ')}</b><br>`;
+  h += `实际命中 <b>${p.actual_hits}</b> 个 vs 随机期望 <b>${p.expected_hits}</b> 个 `
+     + `(z=${p.hit_z > 0 ? '+' : ''}${p.hit_z})<br>`;
+  if (Math.abs(p.hit_z) < 2) {
+    h += `<span class="hit">✅ 与随机无显著差异 — 热号没有预测力</span><br><br>`;
+  } else {
+    h += `<span class="${p.hit_z > 0 ? 'hit' : 'miss'}">⚠️ ${p.hit_z > 0 ? '显著优于' : '显著低于'}随机</span><br><br>`;
+  }
+
+  // 3. 照着买会怎样
+  h += `<b style="color:#fbbf24">【3】照着热号买满测试期会怎样】</b><br>`;
+  h += `投入 ${p.stake.toLocaleString()} 元 · 返奖 ${p.returns.toLocaleString()} 元 · `
+     + `净收益 <b class="${p.net >= 0 ? 'hit' : 'miss'}">${p.net.toLocaleString()} 元</b><br>`;
+  h += `ROI <b class="${p.roi >= 0 ? 'hit' : 'miss'}">${p.roi > 0 ? '+' : ''}${p.roi}%</b>`
+     + ` (剔除大奖后 ${p.roi_ex_big > 0 ? '+' : ''}${p.roi_ex_big}%, `
+     + `中了 ${p.big_prizes} 次大奖)<br>`;
+  if (p.prizes && p.prizes.length) {
+    h += `奖级命中: ` + p.prizes.map(x => `<span class="pill">${x[0]}×${x[1]}</span>`).join('') + '<br>';
+  }
+  h += `<br>`;
+
+  // 4. 排名延续性
+  h += `<b style="color:#fbbf24">【4】排名延续性 (相邻年份热号有没有相关性)</b><br>`;
+  h += `Top-${c.top_k} 重合度: 实测 <b>${c.overlap_mean}</b> vs 随机期望 `
+     + `<b>${c.overlap_expected}</b> (z=${c.overlap_z > 0 ? '+' : ''}${c.overlap_z})<br>`;
+  h += `Spearman ρ: 实测 <b>${c.rho_mean > 0 ? '+' : ''}${c.rho_mean}</b> vs 随机 0 `
+     + `(z=${c.rho_z > 0 ? '+' : ''}${c.rho_z})<br>`;
+  h += `<span class="hit">→ ${c.verdict}</span><br><br>`;
+
+  // 5. 稳定性扫描
+  if (s && s.splits && s.splits.length) {
+    h += `<b style="color:#fbbf24">【5】稳定性扫描 (遍历所有年份切分 — 击碎幻觉的关键)</b><br>`;
+    h += `<table style="width:100%;border-collapse:collapse;font-size:12px">`;
+    h += `<tr style="background:#0f1728">`
+       + `<th style="padding:4px;text-align:left">训练期</th>`
+       + `<th style="padding:4px;text-align:left">测试期</th>`
+       + `<th style="padding:4px;text-align:right">z</th>`
+       + `<th style="padding:4px;text-align:right">ROI%</th>`
+       + `<th style="padding:4px;text-align:right">剔大奖 ROI%</th>`
+       + `<th style="padding:4px;text-align:left">判定</th></tr>`;
+    for (const x of s.splits) {
+      h += `<tr style="border-bottom:1px solid #1e293b">`
+         + `<td style="padding:3px">${x.train.join('-')}</td>`
+         + `<td style="padding:3px">${x.test.join('-')}</td>`
+         + `<td style="padding:3px;text-align:right">${x.hit_z > 0 ? '+' : ''}${x.hit_z}</td>`
+         + `<td style="padding:3px;text-align:right">${x.roi > 0 ? '+' : ''}${x.roi}</td>`
+         + `<td style="padding:3px;text-align:right">${x.roi_ex_big > 0 ? '+' : ''}${x.roi_ex_big}</td>`
+         + `<td style="padding:3px;font-size:11px">${x.significant ? '★显著' : '无显著差异'}</td></tr>`;
+    }
+    h += `</table><br>`;
+    h += `<span class="hit">${s.verdict}</span><br>`;
+    h += `→ 如果换成任何别的切分, 结论都是"和随机一样", 那么"这次有效"就纯粹是挑数据挑出来的.<br><br>`;
+  }
+
+  // 结论
+  h += `<b style="color:#fbbf24">【结论】</b><br>`;
+  h += r.conclusion.split(' | ').join('<br>') + '<br>';
+
+  return h;
+}
+
 // 切换彩种时重建网格
 document.getElementById('check-game').addEventListener('change', buildGrids);
 document.getElementById('score-game').addEventListener('change', buildGrids);
@@ -979,6 +1191,7 @@ async function loadHistory() {
 buildGrids();
 dtRebuild();
 slBuildPicker();
+hiYears();
 </script>
 </body>
 </html>
@@ -1188,9 +1401,47 @@ def api_quick_settle():
         return jsonify({'ok': False, 'error': f'{type(e).__name__}: {e}'}), 500
 
 
+@app.route('/api/hot-illusion', methods=['POST'])
+def api_hot_illusion():
+    """
+    热号幻觉分析 (Tab ⑥)
+    body: {game, train_years:[], test_years:[], top_k, pick_n}
+    """
+    try:
+        from data.hot_illusion import analyze_hot_illusion
+        body = request.get_json() or {}
+        game = body.get('game', 'dlt')
+        train = body.get('train_years') or None
+        test = body.get('test_years') or None
+        top_k = max(3, min(int(body.get('top_k', 10)), 20))
+        pick_n = max(1, min(int(body.get('pick_n', 5)), 10))
+
+        result = analyze_hot_illusion(game, train, test,
+                                      top_k=top_k, pick_n=pick_n)
+        return jsonify(_jsonable(result))
+    except ValueError as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
 @app.route('/api/games')
 def api_games():
-    return jsonify({'ok': True, 'games': [{
+    # 年份列表 (给热号幻觉 Tab 用)
+    years = {}
+    try:
+        from data.hot_illusion import load_by_year
+        for g in ('dlt', 'ssq'):
+            try:
+                years[g] = sorted(load_by_year(g).keys())
+            except Exception:
+                years[g] = []
+    except Exception:
+        years = {'dlt': [], 'ssq': []}
+
+    return jsonify({'ok': True, 'years': years, 'games': [{
         'code': g.code, 'name': g.name,
         'front_range': g.front_range, 'front_count': g.front_count,
         'back_range': g.back_range, 'back_count': g.back_count,
