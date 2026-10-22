@@ -336,7 +336,9 @@ python smoke_test.py
 6. No retrospective-only rating can exceed **49 out of 100** without prospective validation.
 7. **No observed pattern demonstrates a reliable way to predict an independent lottery drawing.**
 
-## 🌐 数据采集 (三个源)
+## 🌐 数据采集 (两域五源)
+
+### 号码彩 (历史开奖)
 
 | 数据源 | 彩种 | 期数 | 时间 | 特点 |
 |--------|------|------|------|------|
@@ -350,10 +352,29 @@ python data/github_fetcher.py --all        # ★主力 (6500+ 期)
 python data/zhcw_fetcher.py --all
 python data/ttz_fetcher.py --all
 
-# 合并 + 导入 DB
-python data/merge_sources.py --all --sources gh,ttz,zhcw
-python data/import_csv.py --all --sources gh,ttz,zhcw
+# 合并 + 导入 DB (带数据保护, 见 data/data_guard.py)
+python main.py crawl --game all
 ```
+
+### 竞彩 (实时赔率)
+
+| 数据源 | 内容 | 费用 | 备注 |
+|--------|------|------|------|
+| **中国竞彩官方** `webapi.sporttery.cn` | HAD/HHAD/CRS/TTG/HAFU 实时赔率 + 赛果 | **免费, 无需 key** | 官方公开 API, 含中文名 + 英文 3 字母码 |
+| **[the-odds-api.com](https://the-odds-api.com)** | 40+ 家博彩公司实时 1X2 盘口 (uk/eu/au/us) | 免费 500 次/月 | 本文实时扫描用此源, 需注册拿 key |
+
+```bash
+# 竞彩实时赔率
+python -c "from data.jingcai_odds import fetch_matches; print(len(fetch_matches()))"
+
+# 跨市场实时扫描 (竞彩 x 境外)
+$env:ODDS_API_KEY = 'your_key_here'
+python scripts/live_scanner.py
+```
+
+> **免费额度提示**: the-odds-api 免费档 **500 次请求/月**。
+> 一次完整扫描约消耗 13~15 次 (每个联赛 1 次)。5 分钟内结果走缓存不重复扣配额。
+> 用量可在响应头 `x-requests-remaining` 查看。
 
 ### 反爬突破 (实测)
 
@@ -442,10 +463,16 @@ python scripts/health_check.py
 
 ## 🤝 致谢
 
+- **[the-odds-api.com](https://the-odds-api.com)** — 实时多博彩公司赔率 API (免费档 500 次/月)，竞彩跨市场扫描的数据源
+- **中国体育彩票官方** (`webapi.sporttery.cn`) — 竞彩实时赔率公开 API (免费无需 key)
 - **DrawScope 0.6.5** (Nutritionanalytics/drawscope) — 端到端黑盒引擎, 30 信号 + 7 DISCLAIMERS
 - **GitHub `yangxb919/lottery-data`** — ★ 2937 + 3516 期完整历史数据
+- **GitHub `huhao930422-debug/football-odds-mirror`** — football-data.co.uk 每日镜像, 22 联赛 × 30+ 季真实历史赔率
 - **GitHub `yeyingbao/ssq-lottery-analysis`** — 双色球 2354 期奖项明细
 - **中彩网 / 天天走势** — 国内中文站点数据
+
+> ⚠️ 引用第三方赔率数据仅用于**研究与教学**。各博彩公司赔率受其条款约束，
+> 本项目不对任何博彩服务提供代理、导流或推荐。
 
 ## ⚖️ 学术诚信声明
 

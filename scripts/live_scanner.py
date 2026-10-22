@@ -1,9 +1,25 @@
 """
 实时双向扫描器: 中国竞彩 × 境外盘口
 =========================================
+数据源
+------
+1. **中国竞彩官方** — https://webapi.sporttery.cn
+   公开 API, **免费无需 key**。HAD/HHAD/CRS/TTG/HAFU 实时赔率 + 赛果。
+   每场带中文名 + **英文 3 字母码** (JUV/RMA/ACM), 可直接匹配境外盘口。
+
+2. **the-odds-api.com** — https://the-odds-api.com
+   第三方赔率聚合 API, **免费档 500 次/月** (需注册拿 key)。
+   覆盖 40+ 家博彩公司实时 1X2 盘口, 支持 regions=uk/eu/au/us。
+   一次完整扫描约消耗 13~15 次请求 (每个联赛 1 次)。
+
+   key 读取顺序:
+     1. 环境变量 ODDS_API_KEY
+     2. 项目根 .odds_api_key 文件
+   剩余额度可从响应头 x-requests-remaining 查看.
+
 输入:
-  - 竞彩官方实时赔率 (webapi.sporttery.cn, 已有采集器)
-  - 境外多公司实时赔率 (the-odds-api.com, 需 API key)
+  - 竞彩官方实时赔率
+  - 境外多公司实时赔率
 输出:
   - 逐场匹配 (中英文队名 + 联赛 + 开赛时间)
   - 每个市场的抽水对比 (竞彩 vs 境外各公司)
@@ -372,6 +388,23 @@ def stake_plan(combo_odds: Sequence[float], total: float = 100.0):
     return [(payout / o, payout) for o in combo_odds]
 
 
+def check_quota(api_key: str) -> Dict:
+    """查询 the-odds-api 剩余配额 (免费档 500 次/月)"""
+    url = f'{OddsAPI.BASE}/sports/?apiKey={api_key}'
+    req = urllib.request.Request(url, headers={'User-Agent': 'lottery-lab'})
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        with opener.open(req, timeout=20) as r:
+            rem = r.headers.get('x-requests-remaining')
+            used = r.headers.get('x-requests-used')
+            limit = r.headers.get('x-requests-limit')
+            return {'ok': True, 'remaining': int(rem) if rem else None,
+                    'used': int(used) if used else None,
+                    'limit': int(limit) if limit else None}
+    except Exception as e:
+        return {'ok': False, 'error': str(e)}
+
+
 # ============================================================
 # 主流程
 # ============================================================
@@ -534,6 +567,7 @@ def main():
     ap.add_argument('--min-profit', type=float, default=0.0,
                     help='最小套利利润 %% (默认 0, 即任何正套利)')
     ap.add_argument('--json', default='', help='结果存 JSON')
+    ap.add_argument('--quota', action='store_true', help='只查 API 剩余配额')
     args = ap.parse_args()
 
     if not args.api_key:
@@ -550,6 +584,15 @@ def main():
     print('拉取竞彩官方实时赔率...')
     jc = fetch_matches()
     print(f'  竞彩 {len(jc)} 场在售')
+
+    if args.quota:
+        q = check_quota(args.api_key)
+        if q.get('ok'):
+            print(f"\n  the-odds-api 配额: 已用 {q['used']} / {q['limit']}, "
+                  f"剩余 {q['remaining']}")
+        else:
+            print(f"  配额查询失败: {q.get('error')}")
+        return 0
 
     r = run_live_scan(args.api_key, args.min_profit / 100.0, jc)
     if not r.get('ok'):
