@@ -36,6 +36,9 @@ ui/static/sessions/
 # 大文件: SQLite 派生库 (从 CSV 可重建)
 data-raw/lottery.db
 
+# 数据库备份 (data_guard 自动生成, 本地留存即可)
+data-raw/backups/
+
 # 个人投注历史 (NDJSON / CSV, 隐私)
 data-raw/my_picks.jsonl
 data-raw/my_picks.csv
