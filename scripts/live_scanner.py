@@ -89,6 +89,13 @@ SPORT_KEYS = {
     '中超': 'soccer_china_superleague',
 }
 
+# 境外博彩公司区域 (the-odds-api regions 参数)
+#   uk  = 英国 (含 Betfair Exchange, 最接近零抽水)
+#   eu  = 欧洲 (Pinnacle / Marathon / 1xBet / 竞彩常见的对手)
+#   au  = 澳新 (Betfair / Sportsbet / Ladbrokes 等, 抽水通常更低)
+#   us  = 美国 (通常抽水最高, 供参考)
+REGIONS = 'uk,eu,au'
+
 # 队名归一化时剔除的噪声词
 NOISE = re.compile if False else None  # 占位, 下面用函数实现
 
@@ -390,7 +397,7 @@ def run_live_scan(api_key: str, min_profit: float = 0.0,
         if not key or key in used_keys:
             continue
         used_keys.add(key)
-        evs = api.upcoming_odds(key, regions='uk,eu')
+        evs = api.upcoming_odds(key, regions=REGIONS)
         ov_by_key[key] = evs
         all_ov.extend(evs)
         if evs:
