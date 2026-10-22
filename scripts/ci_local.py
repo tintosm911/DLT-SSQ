@@ -54,12 +54,16 @@ def run_checks(quick: bool = False) -> list:
     py = sys.executable
     checks = [
         Check('单元测试', [py, 'tests/test_pick_advisor.py'], '核心库 8 个用例'),
+        Check('胆拖精确求解器', [py, 'tests/test_dan_tuo_exact.py'], '5 个性质验证'),
+        Check('奖级一致性', [py, 'scripts/check_prize_consistency.py'],
+              'PRIZE_RULES vs judge_prize'),
         Check('数据守卫测试', [py, 'tests/test_data_guard.py'], '故障注入 22 个用例'),
         Check('文件完整性', [py, 'scripts/check_corrupt.py'], 'null bytes 损坏检测'),
         Check('健康检查', [py, 'scripts/health_check.py'], '11 项'),
         Check('核心模块导入', [py, '-c', '''
 import sys
-mods = ['data.games','data.pick_advisor','data.dan_tuo_core','data.strategy_lab',
+mods = ['data.games','data.pick_advisor','data.dan_tuo_core','data.dan_tuo_exact',
+        'data.strategy_lab',
         'data.hot_illusion','data.sports_odds','data.sports_arb','data.sports_lab2',
         'data.jingcai_odds','data.data_guard','data.live_scan_service',
         'data.data_fetcher','ui','core','analytics.probability_lab','scripts.pick_gui']
@@ -70,7 +74,7 @@ for m in mods:
 if bad:
     print('导入失败:', bad); sys.exit(1)
 print(f'OK {len(mods)} 个模块')
-'''], '16 个模块'),
+'''], '17 个模块'),
         Check('编译检查', [py, '-m', 'compileall', '-q',
                            'data', 'core', 'analytics', 'scripts', 'sports',
                            'tests', 'ui'], '语法'),

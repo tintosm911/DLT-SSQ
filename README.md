@@ -39,7 +39,7 @@
 
 | 你想干的事 | 用这个入口 | 它会告诉你 |
 |---|---|---|
-| 我突然想到一组号，想看看 | Web Tab ① / CLI `check` | 真实命中几等奖 + 期望净收益（-0.99 元/注）|
+| 我突然想到一组号，想看看 | Web Tab ① / CLI `check` | 真实命中几等奖 + 期望净收益（-0.94 元/注）|
 | 这注胆拖值不值 | Web Tab ③ | 展开多少注、花多少、**剔除大奖后**真实回多少 |
 | 我上次那注算什么水平 | Web Tab ⑤ | 20 万次模拟里你排第几 + 长期能否回本 |
 | 哪种玩法最"准" | Web Tab ④ | 13 种策略实测 ROI，没有一个是赢家 |
@@ -184,7 +184,7 @@ python scripts/push_via_api.py --token ghp_xxx
 ```
 
 一个端到端的中国彩种分析平台, 集成:
-- **号码彩**: 大乐透 / 双色球 (历史数据 6500+ 期, 含真实开奖日期)
+- **号码彩**: 大乐透 / 双色球 (历史数据 6455 期, 含真实开奖日期)
 - **竞彩**: Elo + Value Bet + 凯利仓位 + 组合优化
 - **概率统计实验室**: 12 步拆解一等奖 + DrawScope 引擎交叉验证
 - **多源数据采集**: GitHub 开源数据集 + 中彩网 + 天天走势
@@ -249,12 +249,12 @@ python smoke_test.py
 
 **"剔除大奖后的常态净收益"是这个工具最重要的数字** —— 它揭示了为什么买彩票的人会以为自己在赚钱。
 
-## 🎯 核心结论 (真实数据 6500+ 期)
+## 🎯 核心结论 (真实数据 6455 期)
 
 | 彩种 | 期数 | 时间跨度 | 一等奖概率 | 期望净收益 | 凯利最优 |
 |------|------|---------|------------|-----------|---------|
-| **超级大乐透** | **3037 期** | 2007-05 ~ 2026-10 | 1 / 21,425,712 | **-0.99 元/注** | **f* = 0** |
-| **双色球** | **3516 期** | 2003-02 ~ 2026-10 | 1 / 17,721,088 | **-0.81 元/注** | **f* = 0** |
+| **超级大乐透** | **2938 期** | 2007-05 ~ 2026-10 | 1 / 21,425,712 | **-0.94 元/注** | **f* = 0** |
+| **双色球** | **3517 期** | 2003-02 ~ 2026-10 | 1 / 17,721,088 | **-0.86 元/注** | **f* = 0** |
 
 **DrawScope 0.6.5 引擎 (端到端黑盒)** 与我们手写 12 步得到**完全一致**的 χ² 值, 双重验证"号码分布无显著偏离均匀"。
 
@@ -293,20 +293,24 @@ python smoke_test.py
 │   ├── evaluate_picks.py    ★ ① CLI (check/score/oracle/live/history)
 │   ├── pick_gui.py          ★ ② Web GUI (Flask, 端口 9876)
 │   ├── dan_tuo.py           ★ ③ 胆拖分析器 (含剔除大奖的真实期望)
+│   ├── analyze_dantuo.py    ★ 胆拖深度分析 (精确超几何, 零抽样误差)
+│   ├── compare_dantuo_schemes.py  7 组胆拖结构横向对比
+│   ├── dantuo_structure_matrix.py  胆码数量结构矩阵
+│   ├── check_prize_consistency.py   奖级表 vs 判奖逻辑一致性
 │   ├── demo_e2e.py          ★ ④ 端到端诚实演示
-│   ├── health_check.py       9 项健康检查 (可自动修复)
+│   ├── health_check.py       11 项健康检查 (可自动修复)
 │   ├── sports_lab.py         竞彩端到端入口
 │   └── drawscope_*.py        DrawScope 演示
 │
 ├── data-raw/             真实数据 (CSV)
-│   ├── gh_dlt.csv         ★ 大乐透 2937 期
+│   ├── gh_dlt.csv         ★ 大乐透 2938 期
 │   ├── gh_ssq.csv         ★ 双色球 3516 期
 │   ├── ttz_*.csv          天天走势 100 期 (2026)
 │   ├── zhcw_*.csv         中彩网 100 期 (2020, 含真实日期)
-│   └── lottery.db         SQLite (3037 + 3516 期)
+│   └── lottery.db         SQLite (2938 + 3517 期)
 │
 ├── reports/              生成的可视化图表 (PNG)
-└── tests/                pytest 单元测试 (15 个)
+└── tests/                pytest 单元测试 (21 个)
 ```
 
 ## 📊 12 步概率统计实验室 (`analytics/probability_lab.py`)
@@ -314,7 +318,7 @@ python smoke_test.py
 | Step | 名称 | 关键输出 |
 |------|------|----------|
 | 1 | **一等奖概率** | `C(35,5) × C(12,2) = 21,425,712` |
-| 2 | **奖级多元超几何** | 9 奖级 + 期望贡献 = 1.0098 元/注 |
+| 2 | **奖级多元超几何** | 9 奖级 + 期望贡献 = 1.0593 元/注 |
 | 3 | **前区贝叶斯热度** | Beta(α+1, β+30) 后验 → Top-5 0.1905 区间 |
 | 4 | **后区 Dirichlet** | 高频组合后验 |
 | 5 | **遗漏几何分布** | 平均遗漏 5.23 期 (理论 7.00) |
@@ -322,7 +326,7 @@ python smoke_test.py
 | 7 | **皮尔逊相关性** | ≈ 0 (统计噪声) |
 | 8 | **马尔可夫稳态** | ≈ 均匀分布 |
 | 9 | **蒙特卡洛** | 10000 注模拟覆盖率 |
-| 10 | **期望收益 + 方差** | **E[X] = -0.99, σ = 1753** |
+| 10 | **期望收益 + 方差** | **E[X] = -0.94, σ = 1753** |
 | 11 | **凯利最优** | **f\* = 0 (不下注)** |
 | 12 | **大数定律** | 累积频率收敛可视化 (n=10⁵) |
 | **13** | **★ DrawScope** | 30 信号 walk-forward + 7 DISCLAIMERS |
@@ -343,13 +347,13 @@ python smoke_test.py
 
 | 数据源 | 彩种 | 期数 | 时间 | 特点 |
 |--------|------|------|------|------|
-| **★ GitHub `yangxb919/lottery-data`** | DLT/SSQ | 2937+3516 | 2003-2026 | 自动更新, **最完整** |
+| **★ GitHub `yangxb919/lottery-data`** | DLT/SSQ | 2938+3516 | 2003-2026 | 自动更新, **最完整** |
 | 中彩网 `chart.zhcw.com/etc` | DLT/SSQ | 100+100 | 2020-10 | 含真实日期 + 奖项明细 |
 | 天天走势 `chart.ttzoushi.com` | DLT/SSQ | 100+100 | 2026 | 最新数据, 日期是推算 |
 
 ```bash
 # 单源采集
-python data/github_fetcher.py --all        # ★主力 (6500+ 期)
+python data/github_fetcher.py --all        # ★主力 (6453 期)
 python data/zhcw_fetcher.py --all
 python data/ttz_fetcher.py --all
 
@@ -453,21 +457,21 @@ python scripts/health_check.py
 
 | 文件 | 大小 | 期数 | 用途 |
 |------|------|------|------|
-| `data-raw/gh_dlt.csv` | 105KB | **2937** | ★ 主源 (GitHub) |
+| `data-raw/gh_dlt.csv` | 105KB | **2938** | ★ 主源 (GitHub) |
 | `data-raw/gh_ssq.csv` | 130KB | **3516** | ★ 主源 (GitHub) |
 | `data-raw/zhcw_dlt.csv` | 3.7KB | 100 | 备用源 (真实日期) |
 | `data-raw/zhcw_ssq.csv` | 3.9KB | 100 | 备用源 (真实日期) |
 | `data-raw/ttz_dlt.csv` | 3.7KB | 100 | 最新源 (2026) |
 | `data-raw/ttz_ssq.csv` | 3.9KB | 100 | 最新源 (2026) |
 | `data-raw/merged_*.csv` | 7.5KB | 200 | 多源合并 (早期) |
-| `data-raw/lottery.db` | ~0.3MB | 3037+3516 | SQLite 总库 |
+| `data-raw/lottery.db` | ~0.3MB | 2938+3517 | SQLite 总库 |
 
 ## 🤝 致谢
 
 - **[the-odds-api.com](https://the-odds-api.com)** — 实时多博彩公司赔率 API (免费档 500 次/月)，竞彩跨市场扫描的数据源
 - **中国体育彩票官方** (`webapi.sporttery.cn`) — 竞彩实时赔率公开 API (免费无需 key)
 - **DrawScope 0.6.5** (Nutritionanalytics/drawscope) — 端到端黑盒引擎, 30 信号 + 7 DISCLAIMERS
-- **GitHub `yangxb919/lottery-data`** — ★ 2937 + 3516 期完整历史数据
+- **GitHub `yangxb919/lottery-data`** — ★ 2938 + 3516 期完整历史数据
 - **GitHub `huhao930422-debug/football-odds-mirror`** — football-data.co.uk 每日镜像, 22 联赛 × 30+ 季真实历史赔率
 - **GitHub `yeyingbao/ssq-lottery-analysis`** — 双色球 2354 期奖项明细
 - **中彩网 / 天天走势** — 国内中文站点数据
@@ -479,7 +483,7 @@ python scripts/health_check.py
 
 > **彩票是数学上必输的游戏**。本仓库所有代码、所有分析、所有"推荐"都不构成投资建议。
 >
-> 期望值 (期望) = -0.99 元/注 (DLT), **不能被任何选号策略、任何公式、任何"AI 模型"改变**。
+> 期望值 (期望) = -0.94 元/注 (DLT), **不能被任何选号策略、任何公式、任何"AI 模型"改变**。
 >
 > 把彩票当娱乐, 不当投资。这是唯一正确的彩票态度。
 
@@ -498,7 +502,7 @@ python run_lab.py dlt 2>&1 | tail -20
 python -c "
 import sys; sys.stdout.reconfigure(encoding='utf-8')
 from analytics.probability_lab import step1_first_prize_probability, step10_expected_value, step11_kelly_criterion
-"  # → 期望净收益 -0.99/注, 凯利 f*=0
+"  # → 期望净收益 -0.94/注, 凯利 f*=0
 ```
 
 如果 `lottery.db` 没数据, 跑:

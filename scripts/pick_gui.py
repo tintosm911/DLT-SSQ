@@ -31,12 +31,20 @@ except Exception:
 from flask import Flask, jsonify, request, render_template_string
 
 from data.games import get_game, list_games
-from data.pick_advisor import Pick, PickAdvisor, DataSnapshot, PickHistory
+from data.pick_advisor import Pick, PickAdvisor, DataSnapshot, PickHistory, calc_expected_prize
 
 
 HISTORY_PATH = PROJECT_ROOT / 'data-raw' / 'my_picks.jsonl'
 
 app = Flask(__name__)
+
+
+def _net_per_bet(game: str) -> float:
+    """单注期望净收益 —— 从奖级表实时算, 不写死数字"""
+    cfg = get_game(game)
+    _exp, net, _k, _f = calc_expected_prize(
+        game, Pick(front=[1] * cfg.front_count, back=[1] * cfg.back_count))
+    return net
 
 
 # ============================================================
@@ -386,7 +394,7 @@ INDEX_HTML = """
   </div>
 
   <div class="disclaimer">
-    ⚠️ <b>数学上必亏:</b> 大乐透期望净收益 -0.99 元/注, 双色球 -0.81 元/注。
+    ⚠️ <b>数学上必亏:</b> 大乐透期望净收益 {{ '%.2f' % dlt_net }} 元/注, 双色球 {{ '%.2f' % ssq_net }} 元/注。
     凯利公式 f*=0 — 期望你"不下注"。这是工具的诚实结论，不是 bug。<br>
     <b>号码频率 ≠ 未来开奖:</b> 历史开奖号码不会改变下一期的随机分布 (DrawScope DISCLAIMER)。
   </div>
@@ -1583,7 +1591,8 @@ spBuildLeagues();
 # ============================================================
 @app.route('/')
 def index():
-    return render_template_string(INDEX_HTML)
+    return render_template_string(
+        INDEX_HTML, dlt_net=_net_per_bet('dlt'), ssq_net=_net_per_bet('ssq'))
 
 
 @app.route('/api/check', methods=['POST'])

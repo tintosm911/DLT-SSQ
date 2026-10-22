@@ -432,4 +432,8 @@ if __name__ == "__main__":
 
     print(f"\n  总注数: {len(tickets)}")
     print(f"  投入: {len(tickets) * 2} 元")
-    print(f"\n  ⚠️ 期望收益 = {len(tickets) * -0.99:.2f} 元（数学保证亏损）")
+    # 期望收益从奖级表实时计算 (不写死数字, 避免奖级规则更新后漂移)
+    from data.pick_advisor import Pick, calc_expected_prize
+    _exp1, _net1, _k, _f = calc_expected_prize(
+        self.game, Pick(front=[1] * self.front_count, back=[1] * self.back_count))
+    print(f"\n  ⚠️ 期望收益 = {_net1 * len(tickets):.2f} 元（数学保证亏损）")

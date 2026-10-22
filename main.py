@@ -543,7 +543,11 @@ def cmd_recommend(args):
     r.print_recommendations(tickets)
 
     cost = len(tickets) * 2
-    expected_net = cost * -0.495  # 每注期望净收益 -0.99 元（边际 49.5%）
+    # 每注期望净收益从奖级表实时计算 (不写死数字, 避免奖级规则更新后漂移)
+    from data.pick_advisor import Pick, calc_expected_prize
+    exp1, net1, _kelly, _fp = calc_expected_prize(
+        args.game, Pick(front=[1] * game.front_count, back=[1] * game.back_count))
+    expected_net = net1 * len(tickets)
     print(f"\n  总注数: {len(tickets)}")
     print(f"  总投入: {cost} 元")
     print(f"  期望净收益: {expected_net:.2f} 元（数学保证亏损 {abs(expected_net):.2f} 元）")

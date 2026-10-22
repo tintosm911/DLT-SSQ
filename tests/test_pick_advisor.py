@@ -20,22 +20,25 @@ from data.pick_advisor import (
 
 
 def test_calc_expected_prize_dlt():
-    """DLT 期望 ~0.99 元 (中奖 ~2.99 中奖期望 - 2 元成本)"""
+    """DLT 期望净收益 -0.9407 元 (奖级表口径: 浮动奖取保底金额)"""
     p = Pick(front=[1, 2, 3, 4, 5], back=[1, 2])
     exp, net, kelly, prob_1 = calc_expected_prize('dlt', p)
     print(f'DLT: 期望={exp:.4f}, 净收益={net:+.4f}, kelly={kelly:.4f}, 一等奖 1/{int(1/prob_1):,}')
-    assert abs(net + 0.99) < 0.10, f'净收益应当接近 -0.99 元, 实际 {net}'
+    # 期望值是确定量 (不是统计量), 直接断言精确值 —— 奖级表改动会立刻暴露
+    assert abs(net + 0.9407) < 0.001, f'净收益应当是 -0.9407 元, 实际 {net}'
+    assert abs(exp - 1.0593) < 0.001, f'期望奖金应当是 1.0593 元, 实际 {exp}'
     assert kelly == 0.0, '负期望 → kelly 必为 0'
     # 一等奖概率 = 1 / C(35,5)/C(12,2) ≈ 4.67e-08
     assert 4e-8 < prob_1 < 6e-8, f'一等奖 1/21425712, 实际 1/{int(1/prob_1):,}'
 
 
 def test_calc_expected_prize_ssq():
-    """SSQ 期望净收益 ~-0.81 元"""
+    """SSQ 期望净收益 -0.8570 元"""
     p = Pick(front=list(range(1, 7)), back=[7])
     exp, net, kelly, prob_1 = calc_expected_prize('ssq', p)
     print(f'SSQ: 期望={exp:.4f}, 净收益={net:+.4f}, kelly={kelly:.4f}, 一等奖 1/{int(1/prob_1):,}')
-    assert abs(net + 0.81) < 0.10, f'净收益应当接近 -0.81 元, 实际 {net}'
+    assert abs(net + 0.8570) < 0.001, f'净收益应当是 -0.8570 元, 实际 {net}'
+    assert abs(exp - 1.1430) < 0.001, f'期望奖金应当是 1.1430 元, 实际 {exp}'
     assert kelly == 0.0
     # SSQ 一等奖 = 1 / C(33,6)/C(16,1) ≈ 5.99e-08
     assert 5e-8 < prob_1 < 7e-8
