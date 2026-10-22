@@ -43,6 +43,29 @@ if _PROXY:
 else:
     _opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
+# GitHub token: 匿名 API 限流 60 次/小时, 带 token 是 5000 次/小时.
+# 优先读环境变量 GITHUB_TOKEN / GH_TOKEN, 其次读项目根的 .github_token
+def _load_token() -> str:
+    for env in ('SPORTS_GITHUB_TOKEN', 'GITHUB_TOKEN', 'GH_TOKEN'):
+        v = os.environ.get(env, '').strip()
+        if v:
+            return v
+    for name in ('.github_token', 'token.txt'):
+        p = PROJECT_ROOT / name
+        if p.exists():
+            try:
+                v = p.read_text(encoding='utf-8').strip()
+                if v:
+                    return v
+            except OSError:
+                pass
+    return ''
+
+
+GITHUB_TOKEN = _load_token()
+if GITHUB_TOKEN:
+    HDRS['Authorization'] = f'Bearer {GITHUB_TOKEN}'
+
 
 # ============================================================
 # 联赛 → 镜像目录名 映射

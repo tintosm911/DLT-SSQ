@@ -142,7 +142,8 @@ INDEX_HTML = """
     <button class="tab" data-tab="strategy">④ 预测玩法回测</button>
     <button class="tab" data-tab="settle">⑤ 快速算账</button>
     <button class="tab" data-tab="hot">⑥ 热号幻觉</button>
-    <button class="tab" data-tab="history">⑦ 历史记录</button>
+    <button class="tab" data-tab="sports">⑦ 竞彩分析</button>
+    <button class="tab" data-tab="history">⑧ 历史记录</button>
   </div>
 
   <!-- Tab 1: check -->
@@ -328,7 +329,30 @@ INDEX_HTML = """
     <div class="result" id="hi-result">选好训练期和测试期后点"分析"</div>
   </div>
 
-  <!-- Tab 7: history -->
+  <!-- Tab 7: 竞彩分析 -->
+  <div class="panel hidden" id="panel-sports">
+    <div class="row">
+      <label>联赛:</label>
+      <select id="sp-leagues" multiple size="5" style="min-width:150px"></select>
+      <label>套利门槛:</label>
+      <select id="sp-minprofit">
+        <option value="0">0% (任意正套利)</option>
+        <option value="0.005" selected>0.5%</option>
+        <option value="0.01">1%</option>
+        <option value="0.02">2%</option>
+      </select>
+      <button onclick="spRun()">开始分析</button>
+      <button class="secondary" onclick="spJingcai()">刷新竞彩实时盘口</button>
+      <span id="sp-status" style="font-size:12px;color:#94a3b8"></span>
+    </div>
+    <div class="dt-hint">
+      真实历史赔率 (football-data.co.uk 镜像) + 竞彩官方实时赔率 (webapi.sporttery.cn)。
+      每一项都跟抽水/随机基准对比。
+    </div>
+    <div class="result" id="sp-result">选好联赛后点"开始分析" (每个联赛约 10-30 秒)</div>
+  </div>
+
+  <!-- Tab 8: history -->
   <div class="panel hidden" id="panel-history">
     <div class="stats" id="history-stats"></div>
     <table class="history-table" id="history-table">
@@ -1001,6 +1025,209 @@ function hiRender(r) {
   return h;
 }
 
+// ============================================================
+// Tab 7: 竞彩分析
+// ============================================================
+const SP_LEAGUES = [
+  ['premier-league', '英超'],
+  ['la-liga', '西甲'],
+  ['serie-a', '意甲'],
+  ['bundesliga', '德甲'],
+  ['ligue-1', '法甲'],
+  ['eredivisie', '荷甲'],
+  ['primeira-liga', '葡超'],
+  ['scottish-premiership', '苏超'],
+  ['championship', '英冠'],
+  ['brazil', '巴西甲'],
+  ['japan', '日职联'],
+  ['usa', '美职联'],
+];
+
+function spBuildLeagues() {
+  const sel = document.getElementById('sp-leagues');
+  if (sel.options.length) return;
+  SP_LEAGUES.forEach(([code, name], i) => {
+    const o = document.createElement('option');
+    o.value = code; o.textContent = name;
+    if (i < 5) o.selected = true;   // 默认选 5 大
+    sel.appendChild(o);
+  });
+}
+
+function spSelectedLeagues() {
+  const sel = document.getElementById('sp-leagues');
+  return [...sel.selectedOptions].map(o => o.value);
+}
+
+async function spRun() {
+  const status = document.getElementById('sp-status');
+  const leagues = spSelectedLeagues();
+  if (!leagues.length) {
+    document.getElementById('sp-result').innerHTML =
+      '<span class="alert">请至少选一个联赛</span>';
+    return;
+  }
+  status.textContent = '分析中 (每个联赛 10-30 秒)...';
+  document.getElementById('sp-result').innerHTML = '计算中, 请稍候...';
+  const t0 = Date.now();
+  try {
+    const r = await api('sports-lab', {
+      leagues: leagues,
+      min_profit: parseFloat(document.getElementById('sp-minprofit').value),
+      include_jingcai: true,
+    });
+    const dt = ((Date.now() - t0) / 1000).toFixed(1);
+    status.textContent = `✓ 完成 (${dt}s)`;
+    document.getElementById('sp-result').innerHTML = spRender(r);
+  } catch (e) {
+    status.textContent = '';
+    document.getElementById('sp-result').innerHTML =
+      `<span class="alert">错误: ${e.message}</span>`;
+  }
+}
+
+async function spJingcai() {
+  const status = document.getElementById('sp-status');
+  status.textContent = '拉取竞彩官方实时赔率...';
+  try {
+    const r = await fetch('/api/jingcai-live?refresh=1');
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || '获取失败');
+    status.textContent = `✓ 竞彩 ${j.count} 场, 平均抽水 ${(j.vig_mean * 100).toFixed(2)}%`;
+    document.getElementById('sp-result').innerHTML = spRenderJingcai(j);
+  } catch (e) {
+    status.textContent = '';
+    document.getElementById('sp-result').innerHTML =
+      `<span class="alert">错误: ${e.message}</span>`;
+  }
+}
+
+function spRender(r) {
+  if (!r.ok) return `<span class="alert">${r.error || '分析失败'}</span>`;
+  let h = '';
+  h += `<b>竞彩分析</b> · ${r.n_leagues} 个联赛 · ${r.n_matches.toLocaleString()} 场真实历史赔率<br><br>`;
+
+  // 抽水率总表
+  h += `<b style="color:#fbbf24">【1】各博彩公司抽水率 (跨联赛汇总)</b><br>`;
+  h += `<table style="width:100%;border-collapse:collapse;font-size:12px">`;
+  h += `<tr style="background:#0f1728">`
+     + `<th style="padding:4px;text-align:left">公司</th>`
+     + `<th style="padding:4px;text-align:right">总场次</th>`
+     + `<th style="padding:4px;text-align:right">平均抽水%</th>`
+     + `<th style="padding:4px;text-align:right">各联赛波动σ</th></tr>`;
+  const vs = Object.entries(r.vig_summary)
+    .sort((a, b) => a[1].mean - b[1].mean);
+  for (const [k, v] of vs) {
+    const isJc = (k === '中国竞彩');
+    const cls = isJc ? 'miss' : (v.mean < 0.03 ? 'hit' : '');
+    h += `<tr style="border-bottom:1px solid #1e293b">`
+       + `<td style="padding:3px"><b>${k}</b>${isJc ? ' (官方)' : ''}</td>`
+       + `<td style="padding:3px;text-align:right">${v.count.toLocaleString()}</td>`
+       + `<td style="padding:3px;text-align:right" class="${cls}">`
+       + `${(v.mean * 100).toFixed(2)}</td>`
+       + `<td style="padding:3px;text-align:right;color:#64748b">`
+       + `${(v.std_across_leagues * 100).toFixed(2)}</td></tr>`;
+  }
+  h += `</table><br>`;
+
+  // 各联赛
+  h += `<b style="color:#fbbf24">【2】各联赛明细</b><br>`;
+  h += `<table style="width:100%;border-collapse:collapse;font-size:12px">`;
+  h += `<tr style="background:#0f1728">`
+     + `<th style="padding:4px;text-align:left">联赛</th>`
+     + `<th style="padding:4px;text-align:right">场次</th>`
+     + `<th style="padding:4px;text-align:right">最低抽水</th>`
+     + `<th style="padding:4px;text-align:right">可套利%</th>`
+     + `<th style="padding:4px;text-align:right">套利ROI%</th>`
+     + `<th style="padding:4px;text-align:right">Elo ROI%</th>`
+     + `<th style="padding:4px;text-align:right">随机ROI%</th>`
+     + `<th style="padding:4px;text-align:right">竞彩参与套利</th></tr>`;
+  for (const L of r.leagues) {
+    if (!L.matches) continue;
+    const jc = L.jingcai_vs || {};
+    const bt = L.arb_backtest || {};
+    const vb = L.value_bets || {};
+    const rb = L.random || {};
+    h += `<tr style="border-bottom:1px solid #1e293b">`
+       + `<td style="padding:3px"><b>${L.name}</b></td>`
+       + `<td style="padding:3px;text-align:right">${L.matches.toLocaleString()}</td>`
+       + `<td style="padding:3px;text-align:right">${(L.best_vig * 100).toFixed(2)}%`
+       + ` <span style="color:#64748b">${L.best_vig_book}</span></td>`
+       + `<td style="padding:3px;text-align:right">${(jc.pure_rate || 0).toFixed(2)}%</td>`
+       + `<td style="padding:3px;text-align:right" class="${(bt.roi||0) >= 0 ? 'hit' : 'miss'}">`
+       + `${(bt.roi || 0).toFixed(3)}</td>`
+       + `<td style="padding:3px;text-align:right" class="miss">`
+       + `${(vb.Pinnacle?.roi ?? 0).toFixed(2)}</td>`
+       + `<td style="padding:3px;text-align:right" class="miss">`
+       + `${(rb.Pinnacle ?? 0).toFixed(2)}</td>`
+       + `<td style="padding:3px;text-align:right">${jc.using_jingcai ?? 0} 次</td></tr>`;
+  }
+  h += `</table><br>`;
+
+  // 稳定性
+  const s = r.stab || {};
+  h += `<b style="color:#fbbf24">【3】结论稳定性 (跨联赛)</b><br>`;
+  h += `各联赛"纯境外可套利率": ${(s.arb_rate_min||0).toFixed(2)}% ~ `
+     + `${(s.arb_rate_max||0).toFixed(2)}% (σ ${(s.arb_rate_std||0).toFixed(2)})<br>`;
+  h += `<span class="${s.consistent ? 'hit' : 'miss'}">`
+     + `${s.consistent ? '✅ 各联赛结论一致, 稳健' : '⚠️ 各联赛有差异, 需关注'}</span><br>`;
+  h += `含竞彩的套利组合中, 竞彩实际参与 <b>${s.using_jingcai_total}</b> 次<br><br>`;
+
+  h += `<b style="color:#fbbf24">【结论】</b><br>`;
+  h += r.conclusion.split(' | ').join('<br>') + '<br>';
+
+  if (r.jingcai && r.jingcai.ok) {
+    h += `<br><b style="color:#fbbf24">【竞彩官方实时盘口】</b> `
+       + `(${r.jingcai.count} 场, 平均抽水 ${(r.jingcai.vig_mean*100).toFixed(2)}%)<br>`;
+    h += `<table style="width:100%;border-collapse:collapse;font-size:11px">`;
+    h += `<tr style="background:#0f1728">`
+       + `<th style="padding:3px;text-align:left">日期</th>`
+       + `<th style="padding:3px;text-align:left">联赛</th>`
+       + `<th style="padding:3px;text-align:left">对阵</th>`
+       + `<th style="padding:3px;text-align:right">竞彩 胜/平/负</th>`
+       + `<th style="padding:3px;text-align:right">抽水%</th></tr>`;
+    for (const m of r.jingcai.matches.slice(0, 20)) {
+      h += `<tr style="border-bottom:1px solid #1e293b">`
+         + `<td style="padding:2px">${m.date}</td>`
+         + `<td style="padding:2px">${m.league}</td>`
+         + `<td style="padding:2px">${m.home} vs ${m.away}</td>`
+         + `<td style="padding:2px;text-align:right">${m.had.h.toFixed(2)}/${m.had.d.toFixed(2)}/${m.had.a.toFixed(2)}</td>`
+         + `<td style="padding:2px;text-align:right" class="miss">${(m.vig*100).toFixed(2)}</td></tr>`;
+    }
+    h += `</table>`;
+  }
+  return h;
+}
+
+function spRenderJingcai(j) {
+  let h = `<b>中国竞彩官方实时盘口</b> · ${j.count} 场<br>`;
+  h += `<div class="card-grid">`;
+  h += `<div class="mini-card"><div class="lbl">平均抽水</div><div class="val neg">${(j.vig_mean*100).toFixed(2)}%</div></div>`;
+  h += `<div class="mini-card"><div class="lbl">最低</div><div class="val">${(j.vig_min*100).toFixed(2)}%</div></div>`;
+  h += `<div class="mini-card"><div class="lbl">最高</div><div class="val">${(j.vig_max*100).toFixed(2)}%</div></div>`;
+  h += `<div class="mini-card"><div class="lbl">在售场次</div><div class="val">${j.count}</div></div>`;
+  h += `</div><br>`;
+  h += `<table style="width:100%;border-collapse:collapse;font-size:11px">`;
+  h += `<tr style="background:#0f1728">`
+     + `<th style="padding:3px;text-align:left">日期</th>`
+     + `<th style="padding:3px;text-align:left">联赛</th>`
+     + `<th style="padding:3px;text-align:left">对阵</th>`
+     + `<th style="padding:3px;text-align:right">竞彩 胜/平/负</th>`
+     + `<th style="padding:3px;text-align:right">让球盘</th>`
+     + `<th style="padding:3px;text-align:right">抽水%</th></tr>`;
+  for (const m of j.matches) {
+    h += `<tr style="border-bottom:1px solid #1e293b">`
+       + `<td style="padding:2px">${m.date}</td>`
+       + `<td style="padding:2px">${m.league}</td>`
+       + `<td style="padding:2px">${m.home} vs ${m.away} <span style="color:#64748b">${m.home_en}/${m.away_en}</span></td>`
+       + `<td style="padding:2px;text-align:right">${m.had.h.toFixed(2)}/${m.had.d.toFixed(2)}/${m.had.a.toFixed(2)}</td>`
+       + `<td style="padding:2px;text-align:right;color:#64748b">${m.hhad.h ? m.hhad.h.toFixed(2)+'/'+m.hhad.d.toFixed(2)+'/'+m.hhad.a.toFixed(2) : '-'}</td>`
+       + `<td style="padding:2px;text-align:right" class="miss">${(m.vig*100).toFixed(2)}</td></tr>`;
+  }
+  h += `</table>`;
+  return h;
+}
+
 // 切换彩种时重建网格
 document.getElementById('check-game').addEventListener('change', buildGrids);
 document.getElementById('score-game').addEventListener('change', buildGrids);
@@ -1192,6 +1419,7 @@ buildGrids();
 dtRebuild();
 slBuildPicker();
 hiYears();
+spBuildLeagues();
 </script>
 </body>
 </html>
@@ -1425,6 +1653,40 @@ def api_hot_illusion():
         import traceback
         traceback.print_exc()
         return jsonify({'ok': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@app.route('/api/sports-lab', methods=['POST'])
+def api_sports_lab():
+    """
+    竞彩分析 (Tab ⑧)
+    body: {leagues:[], min_profit, include_jingcai}
+    """
+    try:
+        from data.sports_lab2 import run_sports_lab
+        body = request.get_json() or {}
+        leagues = body.get('leagues') or None
+        min_profit = float(body.get('min_profit', 0.005))
+        include_jc = bool(body.get('include_jingcai', True))
+        result = run_sports_lab(leagues=leagues, min_profit=min_profit,
+                                include_jingcai=include_jc)
+        return jsonify(_jsonable(result))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@app.route('/api/jingcai-live', methods=['GET'])
+def api_jingcai_live():
+    """竞彩官方实时盘口"""
+    try:
+        from data.sports_lab2 import analyze_jingcai_live
+        refresh = request.args.get('refresh') == '1'
+        return jsonify(_jsonable(analyze_jingcai_live(force_refresh=refresh)))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 @app.route('/api/games')

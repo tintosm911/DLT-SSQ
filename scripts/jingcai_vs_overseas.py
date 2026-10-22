@@ -39,7 +39,7 @@ OVERSEAS_BOOKS = ['B365', 'Pinnacle', 'WilliamHill', 'Betfair', 'VCBet',
 
 
 def devig(odds: Tuple[float, float, float]) -> np.ndarray:
-    """去水后的隐含概率 (市场共识)"""
+    """赔率 → 去水后的隐含概率 (市场共识)"""
     p = np.array([1.0 / o for o in odds])
     return p / p.sum()
 
@@ -102,8 +102,9 @@ def find_arbs_with_jingcai(matches: Sequence[Dict],
             sides = [('竞彩', jc)] + sides
         for combo in itertools.product(sides, repeat=3):
             (b1, o1), (b2, o2), (b3, o3) = combo
-            if b1 == b2 == b3 == '竞彩':
-                continue          # 全竞彩 = 纯抽水, 无意义
+            # ⚠ 三个来源必须互不相同 —— 同一家公司同时出主胜和平局会算出假套利
+            if b1 == b2 or b2 == b3 or b1 == b3:
+                continue
             s = 1.0 / o1[0] + 1.0 / o2[1] + 1.0 / o3[2]
             if s < 1.0 - min_profit and (best is None or s < best[0]):
                 best = (s, (b1, b2, b3), (o1[0], o2[1], o3[2]))

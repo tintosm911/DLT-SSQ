@@ -30,6 +30,8 @@ ui/static/sessions/
 # 敏感
 .env
 *.key
+.github_token
+token.txt
 
 # ====== 项目特定 ======
 
