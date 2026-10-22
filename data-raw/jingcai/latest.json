@@ -1,0 +1,750 @@
+{
+ "fetched_at": "2026-10-22T20:56:55",
+ "count": 24,
+ "matches": [
+  {
+   "match_id": "2042119",
+   "match_num": "周四001",
+   "date": "2026-10-23",
+   "time": "00:45:00",
+   "weekday": "周四",
+   "league_cn": "欧罗巴",
+   "league_all": "欧罗巴联赛",
+   "league_code": "UEC",
+   "league_slug": "uefa-europa-league",
+   "home_cn": "格风暴",
+   "away_cn": "马赛",
+   "home_en": "SGZ",
+   "away_en": "MAS",
+   "home_all": "格拉茨风暴",
+   "away_all": "马赛",
+   "status": "Selling",
+   "update_time": "2026-10-22 18:51:39",
+   "had": {
+    "h": 4.05,
+    "d": 4.08,
+    "a": 1.57
+   },
+   "hhad": {
+    "h": 2.05,
+    "d": 3.45,
+    "a": 2.84,
+    "goal_line": "+1"
+   },
+   "had_update": "2026-10-22 18:51:39"
+  },
+  {
+   "match_id": "2042120",
+   "match_num": "周四002",
+   "date": "2026-10-23",
+   "time": "00:45:00",
+   "weekday": "周四",
+   "league_cn": "欧罗巴",
+   "league_all": "欧罗巴联赛",
+   "league_code": "UEC",
+   "league_slug": "uefa-europa-league",
+   "home_cn": "波兹南",
+   "away_cn": "桑德兰",
+   "home_en": "LPZ",
+   "away_en": "SUN",
+   "home_all": "波兹南莱赫",
+   "away_all": "桑德兰",
+   "status": "Selling",
+   "update_time": "2026-10-22 18:53:05",
+   "had": {
+    "h": 4.93,
+    "d": 3.98,
+    "a": 1.48
+   },
+   "hhad": {
+    "h": 2.24,
+    "d": 3.3,
+    "a": 2.63,
+    "goal_line": "+1"
+   },
+   "had_update": "2026-10-22 18:53:05"
+  },
+  {
+   "match_id": "2042121",
+   "match_num": "周四003",
+   "date": "2026-10-23",
+   "time": "00:45:00",
+   "weekday": "周四",
+   "league_cn": "欧罗巴",
+   "league_all": "欧罗巴联赛",
+   "league_code": "UEC",
+   "league_slug": "uefa-europa-league",
+   "home_cn": "萨迪纳摩",
+   "away_cn": "奈梅亨",
+   "home_en": "DNZ",
+   "away_en": "NEC",
+   "home_all": "萨格勒布迪纳摩",
+   "away_all": "奈梅亨",
+   "status": "Selling",
+   "update_time": "2026-10-22 19:09:49",
+   "had": {
+    "h": 1.32,
+    "d": 4.75,
+    "a": 6.2
+   },
+   "hhad": {
+    "h": 2.03,
+    "d": 3.65,
+    "a": 2.76,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 19:09:49"
+  },
+  {
+   "match_id": "2042122",
+   "match_num": "周四004",
+   "date": "2026-10-23",
+   "time": "00:45:00",
+   "weekday": "周四",
+   "league_cn": "欧罗巴",
+   "league_all": "欧罗巴联赛",
+   "league_code": "UEC",
+   "league_slug": "uefa-europa-league",
+   "home_cn": "尤文图斯",
+   "away_cn": "雷恩",
+   "home_en": "JUV",
+   "away_en": "REN",
+   "home_all": "尤文图斯",
+   "away_all": "雷恩",
+   "status": "Selling",
+   "update_time": "2026-10-22 20:49:27",
+   "had": {
+    "h": 1.25,
+    "d": 5.1,
+    "a": 7.5
+   },
+   "hhad": {
+    "h": 1.84,
+    "d": 3.82,
+    "a": 3.08,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 20:49:27"
+  },
+  {
+   "match_id": "2042124",
+   "match_num": "周四006",
+   "date": "2026-10-23",
+   "time": "03:00:00",
+   "weekday": "周四",
+   "league_cn": "欧罗巴",
+   "league_all": "欧罗巴联赛",
+   "league_code": "UEC",
+   "league_slug": "uefa-europa-league",
+   "home_cn": "伯恩茅斯",
+   "away_cn": "AC米兰",
+   "home_en": "BOU",
+   "away_en": "ACM",
+   "home_all": "伯恩茅斯",
+   "away_all": "AC米兰",
+   "status": "Selling",
+   "update_time": "2026-10-22 19:03:16",
+   "had": {
+    "h": 1.85,
+    "d": 3.5,
+    "a": 3.3
+   },
+   "hhad": {
+    "h": 3.7,
+    "d": 3.6,
+    "a": 1.72,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 19:03:16"
+  },
+  {
+   "match_id": "2042125",
+   "match_num": "周四007",
+   "date": "2026-10-23",
+   "time": "03:00:00",
+   "weekday": "周四",
+   "league_cn": "欧罗巴",
+   "league_all": "欧罗巴联赛",
+   "league_code": "UEC",
+   "league_slug": "uefa-europa-league",
+   "home_cn": "凯尔特人",
+   "away_cn": "塞尔塔",
+   "home_en": "CEL",
+   "away_en": "CVO",
+   "home_all": "凯尔特人",
+   "away_all": "维戈塞尔塔",
+   "status": "Selling",
+   "update_time": "2026-10-22 20:40:01",
+   "had": {
+    "h": 2.56,
+    "d": 3.1,
+    "a": 2.4
+   },
+   "hhad": {
+    "h": 1.42,
+    "d": 4.2,
+    "a": 5.35,
+    "goal_line": "+1"
+   },
+   "had_update": "2026-10-22 20:40:01"
+  },
+  {
+   "match_id": "2042126",
+   "match_num": "周四008",
+   "date": "2026-10-23",
+   "time": "03:00:00",
+   "weekday": "周四",
+   "league_cn": "欧罗巴",
+   "league_all": "欧罗巴联赛",
+   "league_code": "UEC",
+   "league_slug": "uefa-europa-league",
+   "home_cn": "贝西克塔",
+   "away_cn": "水晶宫",
+   "home_en": "BES",
+   "away_en": "CRY",
+   "home_all": "贝西克塔斯",
+   "away_all": "水晶宫",
+   "status": "Selling",
+   "update_time": "2026-10-22 17:54:07",
+   "had": {
+    "h": 1.95,
+    "d": 3.75,
+    "a": 2.86
+   },
+   "hhad": {
+    "h": 3.9,
+    "d": 3.8,
+    "a": 1.64,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 17:54:07"
+  },
+  {
+   "match_id": "2042127",
+   "match_num": "周四009",
+   "date": "2026-10-23",
+   "time": "03:00:00",
+   "weekday": "周四",
+   "league_cn": "欧罗巴",
+   "league_all": "欧罗巴联赛",
+   "league_code": "UEC",
+   "league_slug": "uefa-europa-league",
+   "home_cn": "霍芬海姆",
+   "away_cn": "里昂",
+   "home_en": "HOF",
+   "away_en": "LYO",
+   "home_all": "霍芬海姆",
+   "away_all": "里昂",
+   "status": "Selling",
+   "update_time": "2026-10-22 20:20:13",
+   "had": {
+    "h": 2.0,
+    "d": 3.9,
+    "a": 2.68
+   },
+   "hhad": {
+    "h": 3.75,
+    "d": 4.15,
+    "a": 1.61,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 20:20:13"
+  },
+  {
+   "match_id": "2042128",
+   "match_num": "周四010",
+   "date": "2026-10-23",
+   "time": "03:00:00",
+   "weekday": "周四",
+   "league_cn": "欧罗巴",
+   "league_all": "欧罗巴联赛",
+   "league_code": "UEC",
+   "league_slug": "uefa-europa-league",
+   "home_cn": "利勒斯特",
+   "away_cn": "皇家社会",
+   "home_en": "LIS",
+   "away_en": "RSO",
+   "home_all": "利勒斯特罗姆",
+   "away_all": "皇家社会",
+   "status": "Selling",
+   "update_time": "2026-10-22 19:09:06",
+   "had": {
+    "h": 6.95,
+    "d": 5.05,
+    "a": 1.27
+   },
+   "hhad": {
+    "h": 2.98,
+    "d": 3.82,
+    "a": 1.88,
+    "goal_line": "+1"
+   },
+   "had_update": "2026-10-22 19:09:06"
+  },
+  {
+   "match_id": "2042130",
+   "match_num": "周四011",
+   "date": "2026-10-23",
+   "time": "03:00:00",
+   "weekday": "周四",
+   "league_cn": "欧协联",
+   "league_all": "欧洲协会联赛",
+   "league_code": "UEF",
+   "league_slug": "uefa-conference-league",
+   "home_cn": "阿贾克斯",
+   "away_cn": "亚特兰大",
+   "home_en": "AJX",
+   "away_en": "ATA",
+   "home_all": "阿贾克斯",
+   "away_all": "亚特兰大",
+   "status": "Selling",
+   "update_time": "2026-10-22 18:26:03",
+   "had": {
+    "h": 1.89,
+    "d": 3.68,
+    "a": 3.04
+   },
+   "hhad": {
+    "h": 3.75,
+    "d": 3.75,
+    "a": 1.68,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 18:26:03"
+  },
+  {
+   "match_id": "2042131",
+   "match_num": "周四012",
+   "date": "2026-10-23",
+   "time": "03:00:00",
+   "weekday": "周四",
+   "league_cn": "欧协联",
+   "league_all": "欧洲协会联赛",
+   "league_code": "UEF",
+   "league_slug": "uefa-conference-league",
+   "home_cn": "摩纳哥",
+   "away_cn": "弗赖堡",
+   "home_en": "MON",
+   "away_en": "FRE",
+   "home_all": "摩纳哥",
+   "away_all": "弗赖堡",
+   "status": "Selling",
+   "update_time": "2026-10-22 19:06:45",
+   "had": {
+    "h": 1.93,
+    "d": 3.35,
+    "a": 3.2
+   },
+   "hhad": {
+    "h": 3.9,
+    "d": 3.65,
+    "a": 1.67,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 19:06:45"
+  },
+  {
+   "match_id": "2042129",
+   "match_num": "周四013",
+   "date": "2026-10-23",
+   "time": "08:30:00",
+   "weekday": "周四",
+   "league_cn": "解放者杯",
+   "league_all": "南美解放者杯",
+   "league_code": "LBC",
+   "league_slug": "copa-libertadores",
+   "home_cn": "弗拉门戈",
+   "away_cn": "拉普大学",
+   "home_en": "FLA",
+   "away_en": "ESD",
+   "home_all": "弗拉门戈",
+   "away_all": "拉普拉塔大学生",
+   "status": "Selling",
+   "update_time": "2026-10-22 20:11:55",
+   "had": {
+    "h": 1.15,
+    "d": 5.4,
+    "a": 13.5
+   },
+   "hhad": {
+    "h": 1.75,
+    "d": 3.2,
+    "a": 4.08,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 20:11:55"
+  },
+  {
+   "match_id": "2042155",
+   "match_num": "周五001",
+   "date": "2026-10-23",
+   "time": "17:00:00",
+   "weekday": "周五",
+   "league_cn": "澳超",
+   "league_all": "澳大利亚超级联赛",
+   "league_code": "AD1",
+   "league_slug": "",
+   "home_cn": "布里斯班",
+   "away_cn": "珀斯",
+   "home_en": "QLR",
+   "away_en": "PFG",
+   "home_all": "布里斯班狮吼",
+   "away_all": "珀斯光荣",
+   "status": "Selling",
+   "update_time": "2026-10-22 13:24:24",
+   "had": {
+    "h": 1.97,
+    "d": 3.25,
+    "a": 3.2
+   },
+   "hhad": {
+    "h": 4.1,
+    "d": 3.6,
+    "a": 1.65,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 13:24:24"
+  },
+  {
+   "match_id": "2042156",
+   "match_num": "周五002",
+   "date": "2026-10-24",
+   "time": "00:30:00",
+   "weekday": "周五",
+   "league_cn": "德乙",
+   "league_all": "德国乙级联赛",
+   "league_code": "GD2",
+   "league_slug": "",
+   "home_cn": "波鸿",
+   "away_cn": "沃夫斯堡",
+   "home_en": "BOC",
+   "away_en": "WOL",
+   "home_all": "波鸿",
+   "away_all": "沃尔夫斯堡",
+   "status": "Selling",
+   "update_time": "2026-10-22 13:24:24",
+   "had": {
+    "h": 2.7,
+    "d": 3.65,
+    "a": 2.06
+   },
+   "hhad": {
+    "h": 1.58,
+    "d": 4.05,
+    "a": 4.0,
+    "goal_line": "+1"
+   },
+   "had_update": "2026-10-22 13:24:24"
+  },
+  {
+   "match_id": "2042157",
+   "match_num": "周五003",
+   "date": "2026-10-24",
+   "time": "01:00:00",
+   "weekday": "周五",
+   "league_cn": "瑞超",
+   "league_all": "瑞典超级联赛",
+   "league_code": "SAL",
+   "league_slug": "",
+   "home_cn": "埃夫斯堡",
+   "away_cn": "马尔默",
+   "home_en": "ELF",
+   "away_en": "MAM",
+   "home_all": "埃尔夫斯堡",
+   "away_all": "马尔默",
+   "status": "Selling",
+   "update_time": "2026-10-22 13:24:24",
+   "had": {
+    "h": 1.9,
+    "d": 3.5,
+    "a": 3.15
+   },
+   "hhad": {
+    "h": 3.8,
+    "d": 3.65,
+    "a": 1.69,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 13:24:24"
+  },
+  {
+   "match_id": "2042158",
+   "match_num": "周五004",
+   "date": "2026-10-24",
+   "time": "02:00:00",
+   "weekday": "周五",
+   "league_cn": "荷甲",
+   "league_all": "荷兰甲级联赛",
+   "league_code": "DFL",
+   "league_slug": "eredivisie",
+   "home_cn": "前进之鹰",
+   "away_cn": "特尔斯达",
+   "home_en": "GAE",
+   "away_en": "TLT",
+   "home_all": "前进之鹰",
+   "away_all": "特尔斯达",
+   "status": "Selling",
+   "update_time": "2026-10-22 13:24:24",
+   "had": {
+    "h": 1.39,
+    "d": 4.38,
+    "a": 5.5
+   },
+   "hhad": {
+    "h": 2.18,
+    "d": 3.75,
+    "a": 2.48,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 13:24:24"
+  },
+  {
+   "match_id": "2042159",
+   "match_num": "周五005",
+   "date": "2026-10-24",
+   "time": "02:00:00",
+   "weekday": "周五",
+   "league_cn": "荷乙",
+   "league_all": "荷兰乙级联赛",
+   "league_code": "DF2",
+   "league_slug": "",
+   "home_cn": "布雷达",
+   "away_cn": "赫拉克勒",
+   "home_en": "NAC",
+   "away_en": "HER",
+   "home_all": "布雷达",
+   "away_all": "赫拉克勒斯",
+   "status": "Selling",
+   "update_time": "2026-10-22 13:24:24",
+   "had": {
+    "h": 2.3,
+    "d": 3.6,
+    "a": 2.4
+   },
+   "hhad": {
+    "h": 4.6,
+    "d": 4.25,
+    "a": 1.48,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 13:24:24"
+  },
+  {
+   "match_id": "2042160",
+   "match_num": "周五006",
+   "date": "2026-10-24",
+   "time": "02:30:00",
+   "weekday": "周五",
+   "league_cn": "德甲",
+   "league_all": "德国甲级联赛",
+   "league_code": "GSL",
+   "league_slug": "bundesliga",
+   "home_cn": "斯图加特",
+   "away_cn": "门兴",
+   "home_en": "STU",
+   "away_en": "MGB",
+   "home_all": "斯图加特",
+   "away_all": "门兴格拉德巴赫",
+   "status": "Selling",
+   "update_time": "2026-10-22 13:24:24",
+   "had": {
+    "h": 1.3,
+    "d": 5.2,
+    "a": 5.95
+   },
+   "hhad": {
+    "h": 1.87,
+    "d": 4.0,
+    "a": 2.9,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 13:24:24"
+  },
+  {
+   "match_id": "2042161",
+   "match_num": "周五007",
+   "date": "2026-10-24",
+   "time": "02:45:00",
+   "weekday": "周五",
+   "league_cn": "意甲",
+   "league_all": "意大利甲级联赛",
+   "league_code": "ISA",
+   "league_slug": "serie-a",
+   "home_cn": "都灵",
+   "away_cn": "蒙扎",
+   "home_en": "ACT",
+   "away_en": "MOZ",
+   "home_all": "都灵",
+   "away_all": "蒙扎",
+   "status": "Selling",
+   "update_time": "2026-10-22 13:24:24",
+   "had": {
+    "h": 1.89,
+    "d": 3.35,
+    "a": 3.32
+   },
+   "hhad": {
+    "h": 3.8,
+    "d": 3.6,
+    "a": 1.7,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 13:24:24"
+  },
+  {
+   "match_id": "2042162",
+   "match_num": "周五008",
+   "date": "2026-10-24",
+   "time": "02:45:00",
+   "weekday": "周五",
+   "league_cn": "法甲",
+   "league_all": "法国甲级联赛",
+   "league_code": "FFL",
+   "league_slug": "ligue-1",
+   "home_cn": "布雷斯特",
+   "away_cn": "尼斯",
+   "home_en": "BRS",
+   "away_en": "NIC",
+   "home_all": "布雷斯特",
+   "away_all": "尼斯",
+   "status": "Selling",
+   "update_time": "2026-10-22 13:24:24",
+   "had": {
+    "h": 2.1,
+    "d": 3.35,
+    "a": 2.82
+   },
+   "hhad": {
+    "h": 4.4,
+    "d": 3.85,
+    "a": 1.56,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 13:24:24"
+  },
+  {
+   "match_id": "2042163",
+   "match_num": "周五009",
+   "date": "2026-10-24",
+   "time": "03:00:00",
+   "weekday": "周五",
+   "league_cn": "英超",
+   "league_all": "英格兰超级联赛",
+   "league_code": "EPL",
+   "league_slug": "premier-league",
+   "home_cn": "伊普斯",
+   "away_cn": "诺丁汉",
+   "home_en": "IPS",
+   "away_en": "NOT",
+   "home_all": "伊普斯维奇",
+   "away_all": "诺丁汉森林",
+   "status": "Selling",
+   "update_time": "2026-10-22 13:24:24",
+   "had": {
+    "h": 2.8,
+    "d": 3.25,
+    "a": 2.17
+   },
+   "hhad": {
+    "h": 1.52,
+    "d": 3.9,
+    "a": 4.7,
+    "goal_line": "+1"
+   },
+   "had_update": "2026-10-22 13:24:24"
+  },
+  {
+   "match_id": "2042164",
+   "match_num": "周五010",
+   "date": "2026-10-24",
+   "time": "03:00:00",
+   "weekday": "周五",
+   "league_cn": "英冠",
+   "league_all": "英格兰冠军联赛",
+   "league_code": "ED1",
+   "league_slug": "",
+   "home_cn": "博尔顿",
+   "away_cn": "米堡",
+   "home_en": "BOL",
+   "away_en": "MID",
+   "home_all": "博尔顿",
+   "away_all": "米德尔斯堡",
+   "status": "Selling",
+   "update_time": "2026-10-22 13:24:24",
+   "had": {
+    "h": 4.95,
+    "d": 4.3,
+    "a": 1.44
+   },
+   "hhad": {
+    "h": 2.4,
+    "d": 3.72,
+    "a": 2.25,
+    "goal_line": "+1"
+   },
+   "had_update": "2026-10-22 13:24:24"
+  },
+  {
+   "match_id": "2042165",
+   "match_num": "周五011",
+   "date": "2026-10-24",
+   "time": "03:00:00",
+   "weekday": "周五",
+   "league_cn": "西甲",
+   "league_all": "西班牙甲级联赛",
+   "league_code": "SFL",
+   "league_slug": "la-liga",
+   "home_cn": "阿拉维斯",
+   "away_cn": "马拉加",
+   "home_en": "ALS",
+   "away_en": "MAL",
+   "home_all": "阿拉维斯",
+   "away_all": "马拉加",
+   "status": "Selling",
+   "update_time": "2026-10-22 13:24:24",
+   "had": {
+    "h": 1.6,
+    "d": 3.45,
+    "a": 4.68
+   },
+   "hhad": {
+    "h": 3.05,
+    "d": 3.25,
+    "a": 2.03,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 13:24:24"
+  },
+  {
+   "match_id": "2042166",
+   "match_num": "周五012",
+   "date": "2026-10-24",
+   "time": "03:45:00",
+   "weekday": "周五",
+   "league_cn": "葡超",
+   "league_all": "葡萄牙超级联赛",
+   "league_code": "PFL",
+   "league_slug": "primeira-liga",
+   "home_cn": "吉马良斯",
+   "away_cn": "马里迪莫",
+   "home_en": "GUM",
+   "away_en": "MAI",
+   "home_all": "吉马良斯",
+   "away_all": "马里迪莫",
+   "status": "Selling",
+   "update_time": "2026-10-22 13:24:24",
+   "had": {
+    "h": 1.52,
+    "d": 3.6,
+    "a": 5.15
+   },
+   "hhad": {
+    "h": 2.8,
+    "d": 3.25,
+    "a": 2.16,
+    "goal_line": "-1"
+   },
+   "had_update": "2026-10-22 13:24:24"
+  }
+ ]
+}
