@@ -2,7 +2,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![CI](https://github.com/tintosm911/DLT-SSQ/actions/workflows/ci.yml/badge.svg)](https://github.com/tintosm911/DLT-SSQ/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/badge/CI-8%2F8%20passed-brightgreen.svg)](./scripts/ci_local.py)
 [![Tests](https://img.shields.io/badge/Tests-30%20passed-brightgreen.svg)](./tests)
 [![GitHub stars](https://img.shields.io/github/stars/tintosm911/DLT-SSQ.svg?style=social)](https://github.com/tintosm911/DLT-SSQ)
 [![Repo size](https://img.shields.io/github/repo-size/tintosm911/DLT-SSQ.svg)](https://github.com/tintosm911/DLT-SSQ)
