@@ -23,6 +23,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from data.games import get_game
+from data.strategy_lab import BIG_PRIZE_LABELS
 
 
 # ============================================================
@@ -204,7 +205,8 @@ def test_predictive(by_year: Dict[str, List[List[int]]], game: str,
         total_return += money
         if money > 0:
             prize_counts[prize] = prize_counts.get(prize, 0) + 1
-            if money >= 10_000:
+            # 大奖按奖级名判定 (SSQ 三等奖 3000 元, 用 1 万阈值会漏)
+            if prize in BIG_PRIZE_LABELS:
                 big_prizes += 1
             else:
                 returns_ex_big += money

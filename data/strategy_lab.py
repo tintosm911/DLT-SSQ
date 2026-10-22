@@ -448,8 +448,12 @@ class StrategyResult:
         }
 
 
-# 大奖阈值 (三等奖以上), 用于拆分"运气"与"策略"
-BIG_PRIZE = 10_000
+# 大奖奖级 (剔除后算"常态 ROI")
+# ⚠ 不能用固定金额阈值! SSQ 三等奖只有 3000 元, DLT 三等奖 1 万,
+#   固定 1 万阈值会让 SSQ 的三等奖混进"常态", 一次就能把 ROI 拉成正的.
+#   必须按奖级名判定: 一等奖 / 二等奖 / 三等奖 都算大奖.
+BIG_PRIZE_LABELS = ('一等奖', '二等奖', '三等奖')
+BIG_PRIZE = 10_000  # 保留兼容 (仅用于显示)
 
 
 def backtest_strategy(strategy: BaseStrategy, front: np.ndarray,
@@ -495,7 +499,8 @@ def backtest_strategy(strategy: BaseStrategy, front: np.ndarray,
         if money > 0:
             res.wins += 1
             res.prize_counts[label] = res.prize_counts.get(label, 0) + 1
-            if money >= BIG_PRIZE:
+            # 大奖按奖级名判定 (SSQ 三等奖 3000 元 < DLT 阈值 1 万)
+            if label in BIG_PRIZE_LABELS:
                 res.big_prizes += 1
             else:
                 res.returns_ex_big += money
