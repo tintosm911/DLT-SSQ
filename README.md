@@ -211,6 +211,12 @@ python scripts/dan_tuo.py --game ssq --front-dan "01 07" \
 
 # ④ 端到端诚实演示 — 证明"完美预测"≠"正期望"
 python scripts/demo_e2e.py
+
+# ⑤ 胆拖结构优化器 — 给预算, 告诉你哪种结构中奖率最高
+python scripts/dan_tuo_optimizer.py --budget 1680 --goal win \
+    --front-pool "2 4 6 10 14 16 18 23 26 32 35" --back-pool "2 4 6 9 12"
+python scripts/dan_tuo_optimizer.py --budget 1000 --goal big   # 追大奖
+python scripts/dan_tuo_optimizer.py --budget 500  --goal value # 追性价比
 ```
 
 ### 系统运维
@@ -289,6 +295,33 @@ python scripts/dantuo_final_compare.py    # 统一口径最终对比
 > 📄 **完整推导**见 [`docs/dan_tuo_theory.md`](docs/dan_tuo_theory.md) ——
 > 含超几何全枚举的完整证明、结构矩阵、两个被交叉验证抓出的真实 bug。
 
+## 🎯 胆拖结构优化器 (Web Tab ⑩)
+
+给一个预算，优化器枚举**全部可能的胆拖结构**（胆码个数 × 拖码池大小），
+用精确超几何算出每个结构的真实概率，告诉你**同样的钱哪种结构最容易中一次奖**。
+
+![胆拖结构优化器](reports/headline_optimizer.png)
+
+```bash
+python scripts/dan_tuo_optimizer.py --budget 1680 --goal win \
+    --front-pool "2 4 6 10 14 16 18 23 26 32 35" --back-pool "2 4 6 9 12"
+```
+
+| 目标 | 含义 |
+|---|---|
+| `win` | 最大中奖率（任意奖级） |
+| `big` | 最大中大奖概率（默认门槛 3000 元 = 四等奖及以上） |
+| `value` | 最大性价比（每元钱换到的中奖率） |
+| `jackpot` | 最大一等奖概率 |
+| `covernum` | 最大注数覆盖 |
+
+以「1680 元 + 你的 11+5 个号码池」为例，优化器给出的最优解是
+**前 2 胆/9 拖 × 后 0 胆/5 拖 = 840 注，中奖率 47.43%**，
+比原结构（1 前胆/1 后胆，42.97%）**高 4.46 个百分点**，而且正好花完 1680 元。
+
+**但期望净收益还是 -790.22 元** —— 一个数都没变。
+优化器只回答"同样的钱怎么更容易中一次小奖"，不回答"怎么不亏"（那个无解）。
+
 ## ⏰ 自动化维护 (Windows 计划任务)
 
 | 任务 | 时间 | 做什么 |
@@ -350,6 +383,8 @@ python scripts/check_script_encoding.py --all      # PowerShell 脚本编码 (�
 │   ├── pick_gui.py          ★ ② Web GUI (Flask, 端口 9876)
 │   ├── dan_tuo.py           ★ ③ 胆拖分析器 (含剔除大奖的真实期望)
 │   ├── analyze_dantuo.py    ★ 胆拖深度分析 (精确超几何, 零抽样误差)
+│   ├── dan_tuo_optimizer.py ★ 胆拖结构优化器 (预算 → 最优结构)
+│   ├── make_optimizer_chart.py  优化器结果图
 │   ├── compare_dantuo_schemes.py  7 组胆拖结构横向对比
 │   ├── dantuo_structure_matrix.py  胆码数量结构矩阵
 │   ├── dantuo_final_compare.py     7 组方案统一口径对比

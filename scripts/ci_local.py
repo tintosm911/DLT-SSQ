@@ -55,6 +55,7 @@ def run_checks(quick: bool = False) -> list:
     checks = [
         Check('单元测试', [py, 'tests/test_pick_advisor.py'], '核心库 8 个用例'),
         Check('胆拖精确求解器', [py, 'tests/test_dan_tuo_exact.py'], '5 个性质验证'),
+        Check('胆拖结构优化器', [py, 'tests/test_dan_tuo_optimizer.py'], '5 个用例'),
         Check('胆拖方案对比', [py, 'scripts/dantuo_final_compare.py'], '统一口径 7 方案'),
         Check('奖级一致性', [py, 'scripts/check_prize_consistency.py'],
               'PRIZE_RULES vs judge_prize'),
@@ -94,9 +95,15 @@ c = app.test_client()
 r = c.get('/')
 assert r.status_code == 200, f'首页 {r.status_code}'
 n = r.get_data(as_text=True).count('data-tab=')
-assert n >= 9, f'Tab {n} < 9'
-print(f'OK {n} Tabs')
-'''], '首页 + Tab 数'),
+assert n >= 10, f'Tab {n} < 10'
+# 优化器端点冒烟
+r2 = c.post('/api/dan-tuo-optimize',
+            json={'game': 'dlt', 'budget': 1680, 'goal': 'win'})
+d = r2.get_json()
+assert d.get('best'), f'优化器无解: {d}'
+assert d['best']['n_bets'] * 2 <= 1680, '优化器超出预算'
+print(f'OK {n} Tabs, 优化器 {d["best"]["structure"]}')
+'''], '首页 + Tab 数 + 优化器'),
     ]
     if not quick:
         checks.append(

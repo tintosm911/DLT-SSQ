@@ -153,6 +153,7 @@ INDEX_HTML = """
     <button class="tab" data-tab="sports">⑦ 竞彩分析</button>
     <button class="tab" data-tab="live">⑧ 实时扫描</button>
     <button class="tab" data-tab="history">⑨ 历史记录</button>
+    <button class="tab" data-tab="optimizer">⑩ 结构优化器</button>
   </div>
 
   <!-- Tab 1: check -->
@@ -391,6 +392,62 @@ INDEX_HTML = """
       </tr></thead>
       <tbody></tbody>
     </table>
+  </div>
+
+  <!-- Tab 10: 胆拖结构优化器 -->
+  <div class="panel hidden" id="panel-optimizer">
+    <div class="row">
+      <label>彩种:</label>
+      <select id="op-game">
+        <option value="dlt">大乐透</option>
+        <option value="ssq">双色球</option>
+      </select>
+      <label>预算:</label>
+      <input type="number" id="op-budget" value="1680" min="2" step="10" style="width:100px">
+      元
+      <label>目标:</label>
+      <select id="op-goal">
+        <option value="win">最大中奖率</option>
+        <option value="big">最大中大奖概率</option>
+        <option value="value">最大性价比</option>
+        <option value="jackpot">最大一等奖概率</option>
+        <option value="covernum">最大注数覆盖</option>
+      </select>
+      <span id="op-threshold-wrap" class="hidden">
+        <label>大奖门槛:</label>
+        <input type="number" id="op-threshold" value="3000" min="5" step="100" style="width:90px"> 元
+      </span>
+      <button onclick="opRun()">开始优化</button>
+      <span id="op-status" style="font-size:12px;color:#94a3b8"></span>
+    </div>
+
+    <div class="row">
+      <label>前区号码池:</label>
+      <input type="text" id="op-front-pool" placeholder="留空 = 不限 (用全部 35 个号)"
+             style="flex:1;min-width:220px">
+      <label>后区号码池:</label>
+      <input type="text" id="op-back-pool" placeholder="留空 = 不限"
+             style="width:180px">
+    </div>
+
+    <div class="row">
+      <label>填号码策略:</label>
+      <select id="op-fill">
+        <option value="hot">按号码从小到大 (填满)</option>
+        <option value="random">随机</option>
+      </select>
+      <span style="font-size:12px;color:#94a3b8">
+        号码选择<strong>不影响任何概率</strong> — 概率只由结构决定
+      </span>
+    </div>
+
+    <div class="dt-hint">
+      优化器枚举全部可能的胆拖结构 (胆码个数 × 拖码池大小), 用
+      <strong>精确超几何全枚举</strong>算每个结构的真实概率, 零模拟误差。
+      搜索结果会告诉你: 在这个预算下, 哪种结构中奖率最高。
+    </div>
+
+    <div class="result" id="op-result">填好预算后点"开始优化"</div>
   </div>
 
   <div class="disclaimer">
@@ -663,6 +720,124 @@ function dtRender(r) {
   h += `期望值一点没变 —— 数学上完全等价.`;
 
   return h;
+}
+
+// ============================================================
+// Tab 10: 胆拖结构优化器
+// ============================================================
+document.getElementById('op-goal').addEventListener('change', () => {
+  const w = document.getElementById('op-threshold-wrap');
+  w.classList.toggle('hidden', document.getElementById('op-goal').value !== 'big');
+});
+
+function opParsePool(s) {
+  if (!s || !s.trim()) return null;
+  const out = s.replace(/,/g, ' ').split(/\\s+/)
+    .map(x => parseInt(x, 10)).filter(x => !isNaN(x));
+  return out.length ? out : null;
+}
+
+function opRender(r) {
+  if (!r.best) {
+    return `<div class="alert">${r.note || '没有满足预算的结构'}</div>`;
+  }
+  const b = r.best;
+  const num = a => a.map(x => String(x).padStart(2, '0')).join(' ');
+  let h = '';
+
+  h += `<div class="mini-card" style="border-color:#059669;background:#f0fdf4">
+    <div class="lbl">★ 最优结构 · ${r.goal_cn}</div>
+    <div style="font-size:15px;font-weight:700;color:#065f46;margin:4px 0">
+      ${b.structure}
+    </div>
+    <div class="val" style="color:#065f46">${b.n_bets.toLocaleString()} 注 ·
+      ${b.cost.toLocaleString()} 元 · 中奖率 ${b.win_rate.toFixed(4)}%</div>
+    <div style="font-size:12px;color:#047857;margin-top:6px">
+      前区 胆 <b>${num(b.front_dan) || '(无)'}</b> / 拖 <b>${num(b.front_tuo)}</b><br>
+      后区 胆 <b>${num(b.back_dan) || '(无)'}</b> / 拖 <b>${num(b.back_tuo)}</b>
+    </div>
+  </div>`;
+
+  h += `<div class="mini-card">
+    <div class="lbl">期望返奖</div><div class="val">${fmt(b.expected_return)} 元</div>
+  </div>`;
+  h += `<div class="mini-card">
+    <div class="lbl">期望净收益</div>
+    <div class="val ${b.expected_net < 0 ? 'neg' : 'pos'}">${fmt(b.expected_net)} 元</div>
+  </div>`;
+  h += `<div class="mini-card">
+    <div class="lbl">≥${r.threshold.toLocaleString()}元 概率</div>
+    <div class="val">${b.big_prob.toFixed(4)}%</div>
+  </div>`;
+  h += `<br>`;
+
+  // 奖级分布
+  h += `<b style="color:#fbbf24">【各奖级命中概率 (至少中一注)】</b><br>`;
+  const labels = Object.keys(b.prize_prob);
+  const moneyMap = r.prize_money || {};
+  labels.sort((a, c) => (moneyMap[c] || 0) - (moneyMap[a] || 0));
+  for (const lab of labels) {
+    const p = b.prize_prob[lab];
+    h += `<span class="pill">${lab} ${(moneyMap[lab] || 0).toLocaleString()}元 ·
+      ${p.toFixed(4)}%</span> `;
+  }
+  h += `<br><br>`;
+
+  // 候选表
+  h += `<b style="color:#fbbf24">【候选结构对比】</b><br>`;
+  h += `<table style="width:100%;font-size:12px;border-collapse:collapse">
+    <tr style="background:#f1f5f9">
+      <th style="text-align:left;padding:5px">结构</th>
+      <th style="text-align:right;padding:5px">注数</th>
+      <th style="text-align:right;padding:5px">花费</th>
+      <th style="text-align:right;padding:5px">中奖率</th>
+      <th style="text-align:right;padding:5px">≥门槛</th>
+    </tr>`;
+  for (const c of r.candidates) {
+    h += `<tr style="border-bottom:1px solid #e2e8f0">
+      <td style="padding:4px 5px">${c.structure}</td>
+      <td style="text-align:right;padding:4px 5px">${c.n_bets.toLocaleString()}</td>
+      <td style="text-align:right;padding:4px 5px">${c.cost.toLocaleString()}</td>
+      <td style="text-align:right;padding:4px 5px">${c.win_rate.toFixed(2)}%</td>
+      <td style="text-align:right;padding:4px 5px">${c.big_prob.toFixed(4)}%</td>
+    </tr>`;
+  }
+  h += `</table><br>`;
+
+  h += `<div class="alert" style="margin-top:8px">
+    <b>期望值一个都没变</b> —— 所有结构的单注期望净收益都是
+    ${fmt(b.expected_net / b.n_bets)} 元/注。<br>
+    优化器只帮你回答一件事: <b>同样的钱, 哪种结构更容易中一次奖</b>。<br>
+    号码选择对概率<b>零影响</b> (概率只由胆码个数与拖码池大小决定)。
+  </div>`;
+  return h;
+}
+
+async function opRun() {
+  const status = document.getElementById('op-status');
+  const goal = document.getElementById('op-goal').value;
+  status.textContent = '搜索中...';
+  const t0 = Date.now();
+  try {
+    const r = await api('dan-tuo-optimize', {
+      game: document.getElementById('op-game').value,
+      budget: parseFloat(document.getElementById('op-budget').value) || 100,
+      goal: goal,
+      big_threshold: goal === 'big'
+        ? (parseFloat(document.getElementById('op-threshold').value) || 3000) : null,
+      front_pool: opParsePool(document.getElementById('op-front-pool').value),
+      back_pool: opParsePool(document.getElementById('op-back-pool').value),
+      fill: document.getElementById('op-fill').value,
+      top: 8,
+    });
+    const dt = ((Date.now() - t0) / 1000).toFixed(1);
+    status.textContent = `✓ 完成 (${dt}s, 搜索 ${r.searched} 种结构)`;
+    document.getElementById('op-result').innerHTML = opRender(r);
+  } catch (e) {
+    status.textContent = '';
+    document.getElementById('op-result').innerHTML =
+      `<span class="alert">错误: ${e.message}</span>`;
+  }
 }
 
 // ============================================================
@@ -1923,6 +2098,51 @@ def api_dan_tuo():
             seed=seed,
         )
         # numpy 标量转原生类型, 否则 jsonify 序列化失败
+        return jsonify(_jsonable(result))
+    except ValueError as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@app.route('/api/dan-tuo-optimize', methods=['POST'])
+def api_dan_tuo_optimize():
+    """
+    胆拖结构优化器 (Tab ⑩)
+    body: {game, budget, goal, big_threshold, front_pool:[], back_pool:[],
+           fill, top}
+    """
+    try:
+        from data.dan_tuo_optimizer import optimize
+        body = request.get_json() or {}
+        game = body.get('game', 'dlt')
+        budget = float(body.get('budget', 100))
+        goal = body.get('goal', 'win')
+        thr = body.get('big_threshold')
+        thr = float(thr) if thr not in (None, '') else None
+
+        def _pool(v):
+            if not v:
+                return None
+            if isinstance(v, str):
+                v = v.replace(',', ' ').split()
+            out = []
+            for x in v:
+                try:
+                    out.append(int(x))
+                except (TypeError, ValueError):
+                    pass
+            return sorted(set(out)) or None
+
+        result = optimize(
+            game, budget=budget, goal=goal, big_threshold=thr,
+            front_pool=_pool(body.get('front_pool')),
+            back_pool=_pool(body.get('back_pool')),
+            fill=body.get('fill', 'hot'),
+            top_n=int(body.get('top', 8)),
+        )
         return jsonify(_jsonable(result))
     except ValueError as e:
         return jsonify({'ok': False, 'error': str(e)}), 400
