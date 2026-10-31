@@ -393,6 +393,7 @@ python scripts/check_script_encoding.py --all      # PowerShell 脚本编码 (�
 │   ├── audit_data_integrity.py      数据完整性审计 (期号连续性/间隔/跨年)
 │   ├── verify_draws_against_official.py  本地库 vs 官方 API 交叉验证
 │   ├── verify_all_draws.py       全量对拍 (逐期核对 + --fix 修正)
+│   ├── push_now.py           一键推送 (自动取 token, 绕开被挡的 git 协议)
 │   ├── check_script_encoding.py     Windows 脚本编码检查 (PS 需 UTF-8 BOM)
 │   ├── update_draws.py              开奖数据每日增量更新 (计划任务用)
 │   ├── schedule_jobs.ps1            计划任务统一管理 (竞彩快照 + 开奖更新)

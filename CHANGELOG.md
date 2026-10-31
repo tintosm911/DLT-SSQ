@@ -29,6 +29,16 @@
 CLI：`scripts/dan_tuo_optimizer.py`（`--budget` / `--goal` / `--front-pool` / `--back-pool`）
 Web：**Tab ⑩ 结构优化器** + `POST /api/dan-tuo-optimize`
 
+### 🔧 网络: API 通道推送 + workflow 限制实测
+
+公司网当前 `github.com:443` **TCP 超时**（git 协议推不动），但 `api.github.com:443` 通（2.2s）。
+所以推送走 `scripts/push_now.py`（自动从 credential manager 取 token，不出现在命令行）→ `push_via_api.py`（Git Data API）。
+
+**实测结论**：GitHub **禁止通过 API 写 workflow 文件** ——
+`POST /git/trees` 遇到 `.github/workflows/*` 直接返回 **404**（伪装成 Not Found）。
+→ `.github/workflows/ci.yml` 只能走 `git push`，且 token 必须带 `workflow` scope。
+（本次已把该文件本地提交，等带 scope 的 PAT + 网络恢复即可推送。）
+
 ### 🧪 测试
 
 新增 `tests/test_dan_tuo_optimizer.py`（5 项）：
