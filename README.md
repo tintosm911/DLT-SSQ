@@ -253,8 +253,8 @@ python smoke_test.py
 
 | 彩种 | 期数 | 时间跨度 | 一等奖概率 | 期望净收益 | 凯利最优 |
 |------|------|---------|------------|-----------|---------|
-| **超级大乐透** | **2938 期** | 2007-05 ~ 2026-10 | 1 / 21,425,712 | **-0.94 元/注** | **f* = 0** |
-| **双色球** | **3517 期** | 2003-02 ~ 2026-10 | 1 / 17,721,088 | **-0.86 元/注** | **f* = 0** |
+| **超级大乐透** | **2941 期** | 2007-05 ~ 2026-10 | 1 / 21,425,712 | **-0.94 元/注** | **f* = 0** |
+| **双色球** | **3521 期** | 2003-02 ~ 2026-10 | 1 / 17,721,088 | **-0.86 元/注** | **f* = 0** |
 
 **DrawScope 0.6.5 引擎 (端到端黑盒)** 与我们手写 12 步得到**完全一致**的 χ² 值, 双重验证"号码分布无显著偏离均匀"。
 
@@ -288,6 +288,31 @@ python scripts/dantuo_final_compare.py    # 统一口径最终对比
 
 > 📄 **完整推导**见 [`docs/dan_tuo_theory.md`](docs/dan_tuo_theory.md) ——
 > 含超几何全枚举的完整证明、结构矩阵、两个被交叉验证抓出的真实 bug。
+
+## ⏰ 自动化维护 (Windows 计划任务)
+
+| 任务 | 时间 | 做什么 |
+|---|---|---|
+| `LotteryOddsSnapshot` | 每天 09:00 + 21:00 | 抓竞彩官方赔率存档（09:00 开盘 / 21:00 临场） |
+| `LotteryDrawUpdate` | 每天 21:30 | 从官方 API 增量更新开奖数据入 SQLite |
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\schedule_jobs.ps1 -Install   # 安装
+powershell -ExecutionPolicy Bypass -File scripts\schedule_jobs.ps1 -Status    # 查看状态
+powershell -ExecutionPolicy Bypass -File scripts\schedule_jobs.ps1 -Uninstall # 卸载
+```
+
+配套的守门脚本（都已进 CI）：
+
+```bash
+python scripts/audit_data_integrity.py             # 期号连续性 / 日期间隔 / 跨年衔接
+python scripts/verify_draws_against_official.py    # 本地库 vs 官方 API 对拍
+python scripts/check_script_encoding.py --all      # PowerShell 脚本编码 (需 UTF-8 BOM)
+```
+
+> ⚠ **PowerShell 脚本必须存为 UTF-8 with BOM**，且 `param()` 必须是第一个语句。
+> v2.6.0 修的就是这个 —— 无 BOM 的 .ps1 在 PowerShell 5.1 下按 GBK 解码，
+> 中文乱码直接破坏引号，脚本**完全跑不起来**（表现为"计划任务从没注册过"）。
 
 ## 🏗️ 项目架构
 
@@ -330,6 +355,12 @@ python scripts/dantuo_final_compare.py    # 统一口径最终对比
 │   ├── dantuo_final_compare.py     7 组方案统一口径对比
 │   ├── make_dantuo_chart.py        胆拖结构分析图
 │   ├── check_prize_consistency.py   奖级表 vs 判奖逻辑一致性
+│   ├── audit_data_integrity.py      数据完整性审计 (期号连续性/间隔/跨年)
+│   ├── verify_draws_against_official.py  本地库 vs 官方 API 交叉验证
+│   ├── verify_all_draws.py       全量对拍 (逐期核对 + --fix 修正)
+│   ├── check_script_encoding.py     Windows 脚本编码检查 (PS 需 UTF-8 BOM)
+│   ├── update_draws.py              开奖数据每日增量更新 (计划任务用)
+│   ├── schedule_jobs.ps1            计划任务统一管理 (竞彩快照 + 开奖更新)
 │   ├── demo_e2e.py          ★ ④ 端到端诚实演示
 │   ├── health_check.py       11 项健康检查 (可自动修复)
 │   ├── sports_lab.py         竞彩端到端入口

@@ -1,4 +1,4 @@
-# Dry-run：只显示会安装哪些任务，不实际写注册表
+﻿# Dry-run：只显示会安装哪些任务，不实际写注册表
 . "$PSScriptRoot\install_scheduler.ps1" -ProjectDir "F:\MiniMAX工作区\体育彩票预测项目" -DryRun 2>&1 | Out-Null
 # 上面会失败因为脚本本身有 Uninstall 分支不能 source
 # 改用 dot-sourcing 不带参数

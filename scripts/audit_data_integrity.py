@@ -95,6 +95,12 @@ def audit(game: str) -> dict:
     # --- 每年期数 ---
     per_year = {y: len(v) for y, v in by_year.items()}
 
+    # --- 同日期多条 (期号错位 / 日期标错的典型信号) ---
+    by_date = collections.defaultdict(list)
+    for p, d in zip(periods, dates):
+        by_date[d].append(p)
+    dup_dates = {d: ps for d, ps in by_date.items() if len(ps) > 1}
+
     return {
         'game': game,
         'name': cfg.name,
@@ -107,6 +113,7 @@ def audit(game: str) -> dict:
         'gap_dist': dict(sorted(gap_dist.items())),
         'big_gaps': big_gaps,
         'year_jumps': year_jumps,
+        'dup_dates': dup_dates,
         'dates': dates,
         'periods': periods,
     }
@@ -178,10 +185,20 @@ def main():
                   f'{max(g for *_, g in a["year_jumps"])} 天)')
         print()
 
+        # 同日期多条 —— 期号错位 / 日期标错的信号
+        if a['dup_dates']:
+            print(f'  ❌ 同日期多条 {len(a["dup_dates"])} 处 (期号或日期可能错位):')
+            for d, ps in sorted(a['dup_dates'].items())[:20]:
+                print(f'      {d} -> {ps}')
+            print('      修复: python scripts/verify_all_draws.py --fix')
+        else:
+            print('  ✅ 每个开奖日期只对应一期')
+        print()
+
         # 结论
-        ok = not a['gaps_in_seq'] and not bad
+        ok = (not a['gaps_in_seq'] and not bad and not a['dup_dates'])
         all_ok = all_ok and ok
-        print(f'  结论: {"✅ 库完整, 无缺期" if ok else "❌ 存在缺期, 需排查采集器"}')
+        print(f'  结论: {"✅ 库完整, 无缺期" if ok else "❌ 存在问题, 需排查采集器"}')
 
     print()
     print('=' * 76)

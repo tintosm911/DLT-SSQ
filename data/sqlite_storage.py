@@ -92,13 +92,48 @@ class SQLiteStorage:
     # ============================================================
     # 增删改查
     # ============================================================
+    @staticmethod
+    def _adapt(d) -> Draw:
+        """
+        把 data_fetcher.Draw 适配成 sqlite_storage.Draw。
+
+        两套 Draw 的字段名不一样 (采集层 prize/pool/content vs 存储层
+        prize_money/sales/notes), 不适配就直接 AttributeError。
+        2026-10-31 修复: 增量更新命令因为这个不匹配一直报错。
+        """
+        if hasattr(d, 'prize_money'):
+            return d
+
+        def _num(v):
+            if v is None:
+                return None
+            if isinstance(v, (int, float)):
+                return float(v)
+            s = str(v).replace(',', '').strip()
+            try:
+                return float(s)
+            except ValueError:
+                return None
+
+        return Draw(
+            period=str(d.period),
+            draw_date=str(d.draw_date),
+            game=getattr(d, 'game', 'dlt') or 'dlt',
+            front=list(d.front),
+            back=list(d.back),
+            prize_money=_num(getattr(d, 'prize', None)),
+            sales=_num(getattr(d, 'sales', None)),
+            notes=getattr(d, 'content', None) or getattr(d, 'pool', None),
+        )
+
     def save_draws(self, draws: List[Draw]) -> int:
         """批量保存, 返回成功条数"""
         if not draws:
             return 0
         inserted = 0
         with self._connect() as conn:
-            for d in draws:
+            for raw in draws:
+                d = self._adapt(raw)
                 try:
                     conn.execute(
                         """INSERT OR REPLACE INTO draws

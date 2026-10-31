@@ -25,7 +25,8 @@ from bs4 import BeautifulSoup
 for k in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy']:
     os.environ.pop(k, None)
 
-from .data_fetcher import Draw, URL_OFFICIAL, GAME_NO_DLT, PAGE_SIZE
+from .data_fetcher import (Draw, URL_SPORTTERY, URL_SPORTTERY_LATEST,
+                           URL_CWL, GAME_NO_DLT, PAGE_SIZE)
 from .games import get_game
 
 logger = logging.getLogger(__name__)
@@ -79,7 +80,7 @@ class OfficialSource(DataSource):
             "isVerify": "1",
         }
         self.session.headers["Referer"] = "https://www.sporttery.cn/"
-        resp = self.session.get(URL_OFFICIAL, params=params, timeout=10)
+        resp = self.session.get(URL_SPORTTERY, params=params, timeout=10)
         resp.raise_for_status()
         data = resp.json()
 
@@ -98,7 +99,7 @@ class OfficialSource(DataSource):
             "isVerify": "1",
         }
         self.session.headers["Referer"] = "https://www.sporttery.cn/"
-        resp = self.session.get(URL_OFFICIAL, params=params, timeout=10)
+        resp = self.session.get(URL_SPORTTERY, params=params, timeout=10)
         resp.raise_for_status()
         data = resp.json()
 
@@ -138,6 +139,7 @@ class OfficialSource(DataSource):
             return Draw(
                 period=period,
                 draw_date=draw_date,
+                game='dlt',
                 front=sorted(nums[:5]),
                 back=sorted(nums[5:]),
             )
@@ -196,6 +198,7 @@ class OfficialAuxSource(DataSource):
             return Draw(
                 period=period,
                 draw_date=draw_date,
+                game='dlt',
                 front=sorted(nums[:5]),
                 back=sorted(nums[5:]),
             )
@@ -270,7 +273,8 @@ class FiveHundredSource(DataSource):
                 back = sorted([int(x) for x in back_text.split(",") if x.strip()])
                 if len(front) == 5 and len(back) == 2:
                     draws.append(Draw(
-                        period=period, draw_date=draw_date, front=front, back=back,
+                        period=period, draw_date=draw_date, game='dlt',
+                        front=front, back=back,
                     ))
             except (ValueError, IndexError):
                 continue
@@ -398,7 +402,8 @@ class WelfareSSQSource(DataSource):
             if not all(1 <= n <= cfg.back_range for n in back):
                 return None
 
-            return Draw(period=period, draw_date=draw_date, front=front, back=back)
+            return Draw(period=period, draw_date=draw_date, game='ssq',
+                        front=front, back=back)
         except (ValueError, KeyError) as e:
             logger.debug(f"SSQ 解析失败: {e}")
             return None

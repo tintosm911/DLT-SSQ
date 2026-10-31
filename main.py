@@ -96,45 +96,88 @@ def cmd_fetch(args):
 # 命令 2: update - 增量更新
 # ============================================================
 def cmd_update(args):
-    from data.games import get_game
+    """增量更新开奖数据 (官方源 → SQLite)
+
+    2026-10-31 重写. 原实现从 v2.3.0 起就坏了两个彩种:
+      - DLT: import 了已不存在的 DataFetcher (v2.3.0 修 null bytes 时丢了)
+      - SSQ: save_draws() 传了不存在的 game= 参数
+      - 且 OfficialSource 用的是**福彩**接口 (URL_OFFICIAL + gameNo=281),
+        当"大乐透官方 API"用, 实测直接 JSONDecodeError
+    """
+    from dataclasses import replace
+
+    from data.games import get_game, normalize_period
+    from data.data_fetcher import PAGE_SIZE
+    from data.sqlite_storage import SQLiteStorage
+
     game = get_game(args.game)
+    storage = SQLiteStorage()
+    latest_local = storage.get_latest_period(args.game)
 
-    if args.game == "ssq":
+    if args.game == 'ssq':
         from data.data_source import WelfareSSQSource
-        from data.sqlite_storage import SQLiteStorage
-
         source = WelfareSSQSource()
-        latest_remote = source.fetch_latest()
-        if not latest_remote:
-            print("❌ 无法获取最新期号")
-            return
-
-        storage = SQLiteStorage()
-        latest_local = storage.get_latest_period("ssq")
-
-        if latest_local and int(latest_remote.period) <= int(latest_local):
-            print(f"\n✅ 已是最新: 本地 {latest_local}, 远程 {latest_remote.period}")
-            return
-
-        # 拉取最新几期
-        start = (int(latest_local) + 1) if latest_local else int(latest_remote.period) - 10
-        new_draws = source._fetch_range(start, int(latest_remote.period))
-
-        if new_draws:
-            storage.save_draws(new_draws, game="ssq")
-            print(f"\n✅ 增量更新完成: 新增 {len(new_draws)} 期")
-        else:
-            print("\n✅ 已是最新，无需更新")
     else:
-        from data import DataFetcher
-        fetcher = DataFetcher()
-        new_draws = fetcher.fetch_incremental()
+        from data.data_source import OfficialSource
+        source = OfficialSource()
 
-        if new_draws:
-            fetcher.save_csv(new_draws, append=True)
-            print(f"\n✅ 增量更新完成: 新增 {len(new_draws)} 期")
-        else:
-            print("\n✅ 已是最新，无需更新")
+    print(f"  彩种: {game.name} ({args.game})")
+    print(f"  本地最新: {latest_local or '(空)'}")
+
+    # --- 1) 远程最新一期 ---
+    try:
+        latest_remote = source.fetch_latest()
+    except Exception as e:
+        print(f"  ❌ 获取最新期号失败: {e}")
+        return
+    if not latest_remote:
+        print("  ❌ 无法获取最新期号 (检查网络 / 官方接口)")
+        return
+    remote_period = normalize_period(latest_remote.period, args.game)
+    print(f"  远程最新: {remote_period} ({latest_remote.draw_date})")
+
+    if latest_local and int(remote_period) <= int(latest_local):
+        print("  ✅ 已是最新, 无需更新")
+        return
+
+    # --- 2) 拉新增期 ---
+    new_draws = []
+    if args.game == 'ssq':
+        # 福彩 API 按期号逐期查
+        start = (int(latest_local) + 1) if latest_local else int(remote_period) - 10
+        print(f"  拉取 {start} ~ {remote_period} ...")
+        new_draws = source._fetch_range(start, int(remote_period))
+    else:
+        # 体彩 API 分页: 从最新页往前翻, 遇到已存在的期号就停
+        print("  翻页拉取 ...")
+        for page in range(1, 8):          # 最多 7 页 = 210 期
+            try:
+                batch = source.fetch_page(page, PAGE_SIZE)
+            except Exception as e:
+                print(f"    ⚠ 第 {page} 页失败: {e}")
+                break
+            if not batch:
+                break
+            reached_old = False
+            for d in batch:
+                p = normalize_period(d.period, args.game)
+                if latest_local and int(p) <= int(latest_local):
+                    reached_old = True
+                    break
+                new_draws.append(replace(d, period=p, game=args.game))
+            if reached_old:
+                break
+
+    # --- 3) 落库 ---
+    if not new_draws:
+        print("  ⚠ 没抓到新期号 (可能接口变更)")
+        return
+    n = storage.save_draws(new_draws)
+    print(f"  ✅ 新增 {n} 期入库")
+    for d in sorted(new_draws, key=lambda x: x.period):
+        print(f"     {d.period}  {d.draw_date}  "
+              f"前 {' '.join(f'{v:02d}' for v in d.front)}  "
+              f"后 {' '.join(f'{v:02d}' for v in d.back)}")
 
 
 # ============================================================

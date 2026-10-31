@@ -2,6 +2,85 @@
 
 本项目的所有版本变更都会记录在这里。版本遵循 [SemVer](https://semver.org/)。
 
+## [v2.6.0] - 2026-10-31
+
+### 🔧 修一整条断掉的采集链路 (三个静默故障)
+
+上一周交付后这 8 天**什么都没更新**（开奖库停在 10-21，快照停在 10-22）。
+排查下来是三个叠在一起的故障 —— 每一个都是**静默**的，不主动查根本发现不了。
+
+| # | 故障 | 现象 | 根因 | 修法 |
+|---|---|---|---|---|
+| 1 | **官方源用错域** | `OfficialSource` 拉大乐透直接 `JSONDecodeError` | `URL_OFFICIAL` 指向**福彩**接口 cwl.gov.cn，`GAME_NO_DLT='281'` 也是福彩编号，但类名写着"大乐透官方 API" | 拆成 `URL_SPORTTERY`（体彩 gameNo=85）/ `URL_CWL`（福彩），`OfficialSource` 改用 `getHistoryPageListV1.qry` |
+| 2 | **`Draw` 少 `game` 字段** | 采集产物存不进 SQLite | 采集层 `data_fetcher.Draw` 没有 `game`，存储层 `save_draws` 要 `d.game` → AttributeError | `Draw` 补 `game` 字段，所有采集源显式标注彩种 |
+| 3 | **字段名不匹配** | `save_draws` 报 `unexpected keyword argument 'game'` | 存储层读 `d.prize_money`/`d.notes`，采集层是 `d.prize`/`d.content` | `SQLiteStorage._adapt()` 做显式字段适配 |
+
+另外 `DataFetcher` 类在 v2.3.0 修 null bytes 时被整个丢了（`main.py update` 仍在 import 它），
+`cmd_update` 已重写为"官方源 → SQLite"统一链路。
+
+**验证**：新增 `scripts/verify_draws_against_official.py` —— 用**完全独立的第二条链路**
+（裸 HTTP，不复用项目采集代码）跟官方 API 对拍，7 期全部一致。
+
+### 🔧 修 PowerShell 计划任务（两个经典坑）
+
+`scripts/schedule_snapshot.ps1` **从未成功执行过**，所以竞彩快照存档任务一直不存在。
+
+| 坑 | 症状 | 修法 |
+|---|---|---|
+| **UTF-8 无 BOM** | PowerShell 5.1 按系统 ANSI（中文=GBK）解码 → 中文乱码破坏引号 → `The string is missing the terminator` | 存为 **UTF-8 with BOM**，新增 `scripts/check_script_encoding.py` 守门并进 CI |
+| **`param()` 前有 here-string** | `"""..."""` 在 PowerShell 里是**字符串表达式**不是注释，导致 `param()` 不被识别为参数块 → `InvalidLeftHandSide` | 文档改用 `#` 注释，`param()` 放文件第一行 |
+
+顺带修掉：两个时间点用**同一个 TaskName** 注册，`-Force` 把前一个覆盖掉 → 只剩 1 个触发时间。
+现在改成 **1 个任务 + N 个 trigger**。
+
+### ⏰ 计划任务统一管理
+
+新增 `scripts/schedule_jobs.ps1`，统一管理两个后台任务：
+
+| 任务 | 时间 | 做什么 |
+|---|---|---|
+| `LotteryOddsSnapshot` | 每天 09:00 + 21:00 | 竞彩赔率快照（开盘 / 临场） |
+| `LotteryDrawUpdate` | 每天 21:30 | 开奖数据增量更新入 SQLite |
+
+已实际注册并**手动触发验证通过**（`LastTaskResult = 0`）。
+`scripts/schedule_snapshot.ps1` 保留为兼容入口（委托给 schedule_jobs.ps1）。
+
+### 📊 数据更新
+
+大乐透 +3 期（2026121~2026123）、双色球 +4 期（2026121~2026124），
+与官方 API 交叉验证全部一致；审计仍判定两个库**完整无缺**。
+
+| 彩种 | 更新前 | 更新后 |
+|---|---|---|
+| 大乐透 | 2938 期 | **2941 期** |
+| 双色球 | 3517 期 | **3521 期** |
+
+### 🧪 全量对拍工具
+
+新增 `scripts/verify_all_draws.py` —— 把本地库**每一期**都跟官方 API 对一遍：
+
+| 彩种 | 官方覆盖 | 结果 |
+|---|---|---|
+| 大乐透 | 2941 / 2941 期 | ✅ 全部一致 |
+| 双色球 | 2082 / 3521 期（福彩只回溯到 2013） | ✅ 覆盖范围内全部一致 |
+
+**抽查只能发现"最近"的问题，全量才能发现上游数据源的老错误。**
+这次就在全量体检里抓到 SSQ `2026120` 的日期被上游标成了 `2026-10-22`（正确是 `2026-10-20`）——
+肉眼看库完全正常，只有跟官方逐期对拍才暴露。已修正。
+
+配套新增 `scripts/verify_draws_against_official.py`（增量版，进 CI）与
+`scripts/check_script_encoding.py`（脚本编码守门，进 CI）。
+
+### 🧪 CI 扩展
+
+新增 4 项检查（12 → 16 项）：
+- 数据完整性审计（期号连续性 + 日期间隔 + 跨年衔接 + **同日期多条检测**）
+- Windows 脚本编码检查（PS 需 UTF-8 BOM）
+- 本地库 vs 官方 API 交叉验证
+- 全量对拍抽样（最近 20 期逐期核对）
+
+> "同日期多条"这一项是本次新加的 —— 它正是抓到 SSQ 日期错位的那个信号。
+
 ## [v2.5.0] - 2026-10-22
 
 ### 🔧 BUGFIX(核心): 奖级规则表与实际判奖逻辑不一致
