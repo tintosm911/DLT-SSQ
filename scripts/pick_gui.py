@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -173,6 +174,7 @@ INDEX_HTML = """
     <div id="check-back-grid" class="num-grid"></div>
     <div class="row">
       <button onclick="checkAction()">验证</button>
+      <button class="secondary" onclick="checkFillExample()">填入示例 (最近一期真实开奖)</button>
       <button class="secondary" onclick="checkSave()">保存到我的记录</button>
       <span id="check-status" style="font-size:12px;color:#94a3b8"></span>
     </div>
@@ -461,6 +463,15 @@ INDEX_HTML = """
 // ============================================================
 // 前端状态
 // ============================================================
+// ★ fmt 必须是**全局**的: 原来它定义在 dtRender() 内部 (局部 const),
+//   而 Tab ⑩ 的 opRender 也要用 → 作用域外引用 → ReferenceError。
+//   (这个 bug 被"整个 script 语法错误"掩盖着, JS 修好后才暴露)
+function fmt(n) {
+  const v = Number(n);
+  if (!isFinite(v)) return String(n);
+  return (v < 0 ? '' : '+') + v.toFixed(2);
+}
+
 const GAMES = {
   dlt: { front_range: 35, front_count: 5, back_range: 12, back_count: 2,
          front_label: '前区', back_label: '后区', period_hint: '26119' },
@@ -471,6 +482,22 @@ const GAMES = {
 let currentTab = 'check';
 let lastCheckResult = null;
 let lastScoreResult = null;
+
+// ★ 页面内可见提示
+//   2026-11-19: 原来所有校验都用 alert(), 但在 Electron 内置浏览器 /
+//   某些嵌入环境里 alert 会被**静默屏蔽** —— 用户点按钮后界面毫无变化,
+//   看起来就是"点了没反应"。全部改成写进页面。
+function showHint(statusId, resultId, msg) {
+  const st = document.getElementById(statusId);
+  if (st) st.textContent = '⚠ ' + msg;
+  const rs = document.getElementById(resultId);
+  if (rs) rs.innerHTML = '<span class="alert">' + msg + '</span>';
+  if (st) st.style.color = '#fbbf24';
+}
+function clearHint(statusId) {
+  const st = document.getElementById(statusId);
+  if (st) st.style.color = '';
+}
 
 // 初始化号码网格
 function buildGrids() {
@@ -648,7 +675,6 @@ async function dtAnalyze() {
 
 function dtRender(r) {
   const t = r.tickets, e = r.expected, s = r.simulation;
-  const fmt = n => (n < 0 ? '' : '+') + n.toFixed(2);
   let h = '';
 
   h += `<b>${r.game_name}</b> 胆拖分析<br>`;
@@ -928,7 +954,14 @@ function slRender(r) {
   h += `<div class="mini-card"><div class="lbl">其中小奖</div><div class="val">${bd.small_payout}%</div></div>`;
   h += `<div class="mini-card"><div class="lbl">剔除大奖后 ROI</div><div class="val neg">${bd.roi_small_only}%</div></div>`;
   h += `</div>`;
-  h += `一等奖概率 1/${format(Math.round(1 / (bd.detail[0].prob / (bd.detail[0].prob))), '0'))}<br>`;
+  // ★ 2026-11-19 修一个致命 bug:
+  //   原写法 `...1/${format(Math.round(1 / (bd.detail[0].prob / (bd.detail[0].prob))), '0'))}<br>`
+  //   内部又用了反引号 → 提前结束了外层模板字面量 → 整个 <script> 块语法错误
+  //   → **页面上所有 JS 全挂** (点任何按钮都没反应, 号码网格也不渲染)。
+  //   而且那个表达式本身也是错的: 1/(p/p) 恒等于 1, 还用了 Python 的 format()。
+  //   现在直接用后端给的 big_odds 算。
+  const bigOdds = Math.round(1 / bd.big_odds);
+  h += `一等奖概率 1/${bigOdds.toLocaleString()}<br>`;
   h += `→ 一二等奖就占了大奖派奖率的绝大部分, 但需要买 200 多万注才回本<br><br>`;
 
   // 盈亏平衡中奖率
@@ -961,8 +994,8 @@ function slRender(r) {
        + `<span style="color:#64748b;font-size:11px">${s.desc}</span></td>`
        + `<td style="padding:4px;text-align:right">${s.win_rate}</td>`
        + `<td style="padding:4px;text-align:right" class="${cls}">${s.roi}</td>`
-       + `<td style="padding:4px;text-align:right" class="${cls}">${format(Math.round(s.net), 0)}</td>`
-       + `<td style="padding:4px;text-align:right">${format(Math.round(s.max_drawdown), 0)}</td>`
+       + `<td style="padding:4px;text-align:right" class="${cls}">${Math.round(s.net).toLocaleString()}</td>`
+       + `<td style="padding:4px;text-align:right">${Math.round(s.max_drawdown).toLocaleString()}</td>`
        + `<td style="padding:4px;font-size:11px;color:#94a3b8">${top}</td>`
        + `</tr>`;
   }
@@ -1618,11 +1651,15 @@ function renderResult(r) {
 
   if (hh) {
     html += `<br><b style="color:#fbbf24">--- 历史反查 ---</b><br>`;
-    html += `<b>期号 ${hh.period} (${hh.draw_date || ''})</b> 开奖: 前 ${JSON.parse(JSON.stringify(r.pick.front)).constructor === Array ? '' : ''}`;
-    // 注: actual_draw 在 result 里是 {period, draw_date, front, back} 但被 to_dict 嵌进 historical_hit 里
-    // 为了清晰, 单独显示
-    html += `<br><b>命中:</b> <span class="${hh.win_money > 0 ? 'hit' : 'miss'}">${hh.hit_prize}</span>`;
-    html += `  前${hh.hit_count['前区命中']}/后${hh.hit_count['后区命中']} | `;
+    // ★ 原这行是坏代码: 显示的是"用户选的号"而不是开奖号,
+    //   而且还判断 Array 决定输出 '' (永远输出空)。historical_hit 里
+    //   本来就没有 actual_draw 字段, 所以直接用命中数表达。
+    html += `<b>期号 ${hh.period} (${hh.draw_date || ''})</b><br>`;
+    html += `<b>命中:</b> <span class="${hh.win_money > 0 ? 'hit' : 'miss'}">${hh.hit_prize}</span>`;
+    const hc = hh.hit_count || {};
+    const fKey = hc['前区命中'] !== undefined ? '前区命中' : '红球命中';
+    const bKey = hc['后区命中'] !== undefined ? '后区命中' : '蓝球命中';
+    html += `  ${fKey}${hc[fKey] ?? 0}/${bKey}${hc[bKey] ?? 0} | `;
     html += `<b>奖金:</b> ${hh.win_money.toLocaleString()} 元<br>`;
   }
 
@@ -1634,7 +1671,7 @@ function renderResult(r) {
     for (const n of sorted) {
       const s = r.avg_score[n.toString()] ?? 50;
       const cls = s >= 70 ? 'hot' : (s < 30 ? 'cold' : '');
-      html += `<span class="pill ${cls}">${n}=${Math.round(s)}</span>`;
+      html += `<span class="pill ${cls}">${n}=${Math.round(s)}</span> `;
     }
     html += '<br>';
     html += `<b>热号 (≥70):</b> ${r.algo_scores && picks.filter(n => (r.avg_score[n.toString()] ?? 50) >= 70).join(', ') || '无'}<br>`;
@@ -1650,22 +1687,67 @@ function renderResult(r) {
   return html;
 }
 
+async function checkFillExample() {
+  const status = document.getElementById('check-status');
+  status.textContent = '取最近一期...';
+  try {
+    const game = document.getElementById('check-game').value;
+    const resp = await fetch(`/api/latest-draw?game=${game}`);
+    const d = await resp.json();
+    if (!d.ok || !d.period) {
+      status.textContent = '';
+      document.getElementById('check-result').innerHTML =
+        `<span class="alert">${d.error || '库里没有数据, 先跑 main.py update'}</span>`;
+      return;
+    }
+    document.getElementById('check-period').value = d.period;
+    buildGrids();
+    const mark = (gridId, nums) => {
+      document.querySelectorAll(`#${gridId} .num-btn`).forEach(b => {
+        if (nums.includes(+b.dataset.num)) b.classList.add('selected');
+      });
+    };
+    mark('check-front-grid', d.front);
+    mark('check-back-grid', d.back);
+    updateGridsState('check');
+    status.textContent = `✓ 已填入 ${d.period}, 点"验证"看判奖`;
+    document.getElementById('check-result').innerHTML =
+      `已填入 <b>${d.period}</b> 的真实开奖号<br>`
+      + `<b>${d.front.map(n => String(n).padStart(2, '0')).join(' ')}</b> + `
+      + `<b>${d.back.map(n => String(n).padStart(2, '0')).join(' ')}</b><br>`
+      + `点"验证"看它判成几等奖 (会命中一等奖, 因为填的就是这期的开奖号)`;
+  } catch (e) {
+    status.textContent = '';
+    document.getElementById('check-result').innerHTML =
+      `<span class="alert">错误: ${e.message}</span>`;
+  }
+}
+
 async function checkAction() {
   const sel = getSelected('check');
   const period = document.getElementById('check-period').value.trim();
-  if (!period) { alert('请输入期号'); return; }
+  clearHint('check-status');
+  if (!period) {
+    showHint('check-status', 'check-result',
+      '请先输入期号 (可点"填入示例"自动填最近一期的真实开奖号)');
+    return;
+  }
   if (sel.front.length !== sel.game.front_count || sel.back.length !== sel.game.back_count) {
-    alert(`需选 ${sel.game.front_count} 个前区 + ${sel.game.back_count} 个后区`);
+    showHint('check-status', 'check-result',
+      `需选 ${sel.game.front_count} 个${sel.game.front_label} + ${sel.game.back_count} 个${sel.game.back_label}`
+      + ` (当前 ${sel.front.length} + ${sel.back.length})`);
     return;
   }
   document.getElementById('check-status').textContent = '查询中...';
   try {
-    const r = await api('check', {
+    const resp = await api('check', {
       game: document.getElementById('check-game').value,
       period: period,
       front: sel.front,
       back: sel.back,
     });
+    // ★ 后端返回 {ok:true, result:{...}}, 但 renderResult 期望的是 AssResult 本体
+    const r = resp.result || resp;
     lastCheckResult = r;
     document.getElementById('check-result').innerHTML = renderResult(r);
     document.getElementById('check-status').textContent = '✓ 完成';
@@ -1676,7 +1758,10 @@ async function checkAction() {
 }
 
 async function checkSave() {
-  if (!lastCheckResult) { alert('请先验证'); return; }
+  if (!lastCheckResult) {
+    showHint('check-status', 'check-result', '请先点"验证"得到结果再保存');
+    return;
+  }
   try {
     await api('save', { result: lastCheckResult, note: 'web-check' });
     document.getElementById('check-status').textContent = '✓ 已保存';
@@ -1687,18 +1772,22 @@ async function checkSave() {
 
 async function scoreAction() {
   const sel = getSelected('score');
+  clearHint('score-status');
   if (sel.front.length !== sel.game.front_count || sel.back.length !== sel.game.back_count) {
-    alert(`需选 ${sel.game.front_count} 个前区 + ${sel.game.back_count} 个后区`);
+    showHint('score-status', 'score-result',
+      `需选 ${sel.game.front_count} 个${sel.game.front_label} + ${sel.game.back_count} 个${sel.game.back_label}`
+      + ` (当前 ${sel.front.length} + ${sel.back.length})`);
     return;
   }
   document.getElementById('score-status').textContent = '计算中...';
   try {
-    const r = await api('score', {
+    const resp = await api('score', {
       game: document.getElementById('score-game').value,
       front: sel.front,
       back: sel.back,
       window_n: parseInt(document.getElementById('score-window').value),
     });
+    const r = resp.result || resp;
     lastScoreResult = r;
     document.getElementById('score-result').innerHTML = renderResult(r);
     document.getElementById('score-status').textContent = '✓ 完成';
@@ -1709,7 +1798,10 @@ async function scoreAction() {
 }
 
 async function scoreSave() {
-  if (!lastScoreResult) { alert('请先评分'); return; }
+  if (!lastScoreResult) {
+    showHint('score-status', 'score-result', '请先点"评分"得到结果再保存');
+    return;
+  }
   try {
     await api('save', { result: lastScoreResult, note: 'web-score' });
     document.getElementById('score-status').textContent = '✓ 已保存';
@@ -1768,6 +1860,38 @@ spBuildLeagues();
 def index():
     return render_template_string(
         INDEX_HTML, dlt_net=_net_per_bet('dlt'), ssq_net=_net_per_bet('ssq'))
+
+
+@app.route('/api/latest-draw')
+def api_latest_draw():
+    """
+    取最近一期的真实开奖号 (给前端"填入示例"用)
+
+    GET /api/latest-draw?game=dlt
+    """
+    try:
+        import json as _json
+        from data.sqlite_storage import SQLiteStorage
+
+        game = request.args.get('game', 'dlt')
+        storage = SQLiteStorage()
+        with storage._connect() as conn:
+            row = conn.execute(
+                'SELECT period, draw_date, front_numbers, back_numbers '
+                'FROM draws WHERE game=? ORDER BY draw_date DESC, period DESC '
+                'LIMIT 1', (game,)).fetchone()
+        if not row:
+            return jsonify({'ok': False,
+                            'error': f'库里没有 {game} 数据, 先跑 main.py update'})
+        return jsonify({
+            'ok': True,
+            'period': row['period'],
+            'draw_date': row['draw_date'],
+            'front': sorted(_json.loads(row['front_numbers'])),
+            'back': sorted(_json.loads(row['back_numbers'])),
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'{type(e).__name__}: {e}'}), 500
 
 
 @app.route('/api/check', methods=['POST'])
@@ -2173,6 +2297,80 @@ def _jsonable(obj):
 
 
 # ============================================================
+# 父进程看门狗 (Desktop sidecar 专用)
+# ============================================================
+def _parent_alive(parent_pid: int) -> bool:
+    """
+    判断父进程是否还活着。
+
+    ★ Windows 上**不能用 os.getppid() 判断**:
+      父进程退出后, 其 PID 可能被系统回收并重新分配给别的进程,
+      而子进程的 os.getppid() 仍然返回那个旧 PID —— 于是永远"活着"。
+      实测 2026-11-18: 用 os.getppid() 的看门狗完全失效, 强杀 exe 后
+      sidecar 一直残留 (手动清理才干掉)。
+
+    正确做法: 用 Windows API 打开父进程句柄并读退出码。
+    非 Windows 平台退回 os.getppid() 比较。
+    """
+    if os.name == 'nt':
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            SYNCHRONIZE = 0x00100000
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            STILL_ACTIVE = 259
+            ERROR_ACCESS_DENIED = 5
+
+            kernel32 = ctypes.windll.kernel32
+            kernel32.GetLastError.restype = ctypes.c_uint
+            handle = kernel32.OpenProcess(
+                SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, False, parent_pid)
+            if not handle:
+                # 打不开 → 进程不存在 (同用户不会有权限问题)
+                return ctypes.get_last_error() == ERROR_ACCESS_DENIED
+            try:
+                code = wintypes.DWORD()
+                if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                    return False
+                return code.value == STILL_ACTIVE
+            finally:
+                kernel32.CloseHandle(handle)
+        except Exception:
+            return True    # 判断不了就保守认为活着
+    return os.getppid() == parent_pid
+
+
+def _parent_watchdog(parent_pid: int, interval: float = 3.0):
+    """
+    定期检查父进程是否还活着, 父进程没了就自杀。
+
+    ★ 为什么需要:
+      Tauri 侧用 `kill_on_drop` 清理 sidecar, 但那只在**优雅退出**时生效。
+      如果 exe 被强制结束 (任务管理器 / 崩溃 / 断电), Rust 来不及执行清理,
+      python sidecar 就变成孤儿进程 —— 一直占着端口和内存。
+      实测 2026-11-18: 两次强制结束测试留下 2 个孤儿 pick_gui 进程。
+
+    ★ 零第三方依赖: 只用 ctypes 调 Windows API。
+    """
+    import threading
+    import time
+
+    def loop():
+        while True:
+            time.sleep(interval)
+            if not _parent_alive(parent_pid):
+                try:
+                    print(f'[watchdog] 父进程 {parent_pid} 已退出, sidecar 自行终止')
+                except Exception:
+                    pass
+                os._exit(0)
+
+    t = threading.Thread(target=loop, daemon=True, name='parent-watchdog')
+    t.start()
+
+
+# ============================================================
 # Main
 # ============================================================
 def main():
@@ -2181,12 +2379,19 @@ def main():
     parser.add_argument('--host', default='127.0.0.1', help='监听地址 (默认 127.0.0.1)')
     parser.add_argument('--port', type=int, default=9876, help='监听端口 (默认 9876)')
     parser.add_argument('--debug', action='store_true', help='启用 Flask debug 模式')
+    parser.add_argument('--watch-parent', type=int, default=0,
+                        help='父进程 PID, 父进程退出时本进程自杀 (Desktop sidecar 用)')
     args = parser.parse_args()
+
+    if args.watch_parent > 0:
+        _parent_watchdog(args.watch_parent)
 
     print(f'\n  🎰 号码实战评估器 Web GUI')
     print(f'  📍 浏览器打开:  http://{args.host}:{args.port}/')
     print(f'  📂 历史记录:    {HISTORY_PATH}')
     print(f'  数据库源:      data-raw/lottery.db')
+    if args.watch_parent > 0:
+        print(f'  👀 看门狗:      监控父进程 PID {args.watch_parent}')
     print()
     app.run(host=args.host, port=args.port, debug=args.debug)
 

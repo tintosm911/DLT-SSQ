@@ -82,6 +82,10 @@ def run_checks(quick: bool = False) -> list:
         Check('官方交叉验证', [py, 'scripts/verify_draws_against_official.py',
                                '--n', '2'], '本地库 vs 官方 API'),
         Check('健康检查', [py, 'scripts/health_check.py'], '11 项'),
+        Check('前端契约', [py, 'scripts/check_frontend.py'],
+              'JS 语法 + DOM + 接口契约 + 解包规则'),
+        Check('前端守门回归', [py, 'tests/test_frontend_guard.py'],
+              '注入 bug 验证守门有效'),
 
         # ---- 守门组: 环境与前端 ----
         Check('脚本编码检查', [py, 'scripts/check_script_encoding.py', '--all'],

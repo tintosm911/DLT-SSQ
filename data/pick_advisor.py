@@ -398,7 +398,12 @@ class PickAdvisor:
         if r.hit_prize == '未中' and r.actual_draw:
             w.append(f'实际开奖: 前{r.hit_count.get("前区命中",0)}/{self.cfg.front_count}, 后{r.hit_count.get("后区命中",0)}/{self.cfg.back_count}, 未中奖')
         if r.cold_nums:
-            w.append(f'冷号 {r.cold_nums} 命中率历史上略低于均匀')
+            # ★ 措辞要中性: "冷号命中率略低于均匀"字面没错, 但放在风险提示里
+            #   会被读成"避开冷号能提高中奖率" —— 违背本项目的核心结论
+            #   (冷热号 z=-0.22, 与随机无差异)。
+            w.append(f'冷号 {r.cold_nums} 在本窗口内出现较少 —— '
+                     f'这只是**历史描述**, 不构成选号依据 '
+                     f'(已验证冷热号 z=-0.22, 与随机无差异)')
         if r.first_prize_odds > 0:
             w.append(f'一等奖概率 1/{int(1/r.first_prize_odds):,}')
         # 学术诚信

@@ -234,6 +234,20 @@ def optimize(game: str = 'dlt',
         -c.n_bets,
     ))
 
+    # ★ 去重等价结构:
+    #   当 need=0 (胆码数已经够了) 时, C(t, 0) 恒等于 1 → 拖码池大小不影响注数,
+    #   于是"5胆/5拖"和"5胆/9拖"是完全等价的结构, 列出来只是噪音。
+    #   只保留 (注数, 中奖率, 期望净收益) 都不同的代表。
+    seen = set()
+    unique = []
+    for c in cands:
+        sig = (c.n_bets, round(c.win_rate, 9), round(c.expected_net, 6))
+        if sig in seen:
+            continue
+        seen.add(sig)
+        unique.append(c)
+    cands = unique
+
     results = []
     for c in cands[:top_n]:
         fd, ft, bd, bt = _fill_numbers(game, c, front_pool, back_pool, fill)
