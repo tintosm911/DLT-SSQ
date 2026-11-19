@@ -103,81 +103,29 @@ def cmd_update(args):
       - SSQ: save_draws() 传了不存在的 game= 参数
       - 且 OfficialSource 用的是**福彩**接口 (URL_OFFICIAL + gameNo=281),
         当"大乐透官方 API"用, 实测直接 JSONDecodeError
-    """
-    from dataclasses import replace
 
-    from data.games import get_game, normalize_period
-    from data.data_fetcher import PAGE_SIZE
+    2026-11-19 再修: 原逻辑只比较"远程最新期号 vs 本地最新期号"。
+    但官方 API 的开奖数据**同步有延迟** —— 2026132 是 11-18 开奖的,
+    而 11-18 21:30 那次运行时官方还没同步, 于是判断"已是最新"直接返回,
+    **整期被漏掉且永远补不回来**。
+    现在改为**逐期核对连续性**, 所有缺失期号一次补齐 (见 scripts/update_draws.py)。
+    """
+    from data.games import get_game
     from data.sqlite_storage import SQLiteStorage
+    from scripts.update_draws import update_one
 
     game = get_game(args.game)
     storage = SQLiteStorage()
-    latest_local = storage.get_latest_period(args.game)
-
-    if args.game == 'ssq':
-        from data.data_source import WelfareSSQSource
-        source = WelfareSSQSource()
-    else:
-        from data.data_source import OfficialSource
-        source = OfficialSource()
-
     print(f"  彩种: {game.name} ({args.game})")
-    print(f"  本地最新: {latest_local or '(空)'}")
+    print(f"  本地最新: {storage.get_latest_period(args.game) or '(空)'}")
 
-    # --- 1) 远程最新一期 ---
-    try:
-        latest_remote = source.fetch_latest()
-    except Exception as e:
-        print(f"  ❌ 获取最新期号失败: {e}")
-        return
-    if not latest_remote:
-        print("  ❌ 无法获取最新期号 (检查网络 / 官方接口)")
-        return
-    remote_period = normalize_period(latest_remote.period, args.game)
-    print(f"  远程最新: {remote_period} ({latest_remote.draw_date})")
-
-    if latest_local and int(remote_period) <= int(latest_local):
-        print("  ✅ 已是最新, 无需更新")
-        return
-
-    # --- 2) 拉新增期 ---
-    new_draws = []
-    if args.game == 'ssq':
-        # 福彩 API 按期号逐期查
-        start = (int(latest_local) + 1) if latest_local else int(remote_period) - 10
-        print(f"  拉取 {start} ~ {remote_period} ...")
-        new_draws = source._fetch_range(start, int(remote_period))
+    n, msgs = update_one(args.game, storage, dry_run=args.dry_run)
+    for m in msgs:
+        print(f"     {m}")
+    if n:
+        print(f"  ✅ 新增 {n} 期入库")
     else:
-        # 体彩 API 分页: 从最新页往前翻, 遇到已存在的期号就停
-        print("  翻页拉取 ...")
-        for page in range(1, 8):          # 最多 7 页 = 210 期
-            try:
-                batch = source.fetch_page(page, PAGE_SIZE)
-            except Exception as e:
-                print(f"    ⚠ 第 {page} 页失败: {e}")
-                break
-            if not batch:
-                break
-            reached_old = False
-            for d in batch:
-                p = normalize_period(d.period, args.game)
-                if latest_local and int(p) <= int(latest_local):
-                    reached_old = True
-                    break
-                new_draws.append(replace(d, period=p, game=args.game))
-            if reached_old:
-                break
-
-    # --- 3) 落库 ---
-    if not new_draws:
-        print("  ⚠ 没抓到新期号 (可能接口变更)")
-        return
-    n = storage.save_draws(new_draws)
-    print(f"  ✅ 新增 {n} 期入库")
-    for d in sorted(new_draws, key=lambda x: x.period):
-        print(f"     {d.period}  {d.draw_date}  "
-              f"前 {' '.join(f'{v:02d}' for v in d.front)}  "
-              f"后 {' '.join(f'{v:02d}' for v in d.back)}")
+        print("  ✅ 无缺失期")
 
 
 # ============================================================
@@ -805,6 +753,7 @@ def main():
     # update
     p_update = subparsers.add_parser("update", help="增量更新数据")
     p_update.add_argument("--game", type=str, default="dlt", choices=["dlt", "ssq"], help="彩种: dlt=大乐透, ssq=双色球")
+    p_update.add_argument("--dry-run", action="store_true", help="只查不写")
 
     # analyze
     p_analyze = subparsers.add_parser("analyze", help="CLI 模式分析")

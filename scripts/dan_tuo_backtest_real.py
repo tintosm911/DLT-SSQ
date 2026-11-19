@@ -47,13 +47,19 @@ from data.games import get_game, get_prize_rules
 from data.sqlite_storage import SQLiteStorage
 
 
-def expand(fd, ft, bd, bt):
-    """展开成 (前区组合列表, 后区组合列表)"""
-    cfg = get_game('dlt')
+def expand(game, fd, ft, bd, bt):
+    """展开成 (前区组合列表, 后区组合列表)
+
+    ★ 2026-11-19 修复: 原实现写死 get_game('dlt'), 导致**双色球回测用
+      大乐透的选号数量 (5+2) 展开** —— 注数和中奖率全错。
+      只有真正跑双彩种实测才会发现。
+    """
+    import itertools
+    cfg = get_game(game)
     fc = [sorted(list(fd) + list(c)) for c in
-          __import__('itertools').combinations(ft, cfg.front_count - len(fd))]
+          itertools.combinations(ft, cfg.front_count - len(fd))]
     bc = [sorted(list(bd) + list(c)) for c in
-          __import__('itertools').combinations(bt, cfg.back_count - len(bd))]
+          itertools.combinations(bt, cfg.back_count - len(bd))]
     return fc, bc
 
 
@@ -70,7 +76,19 @@ def load_draws(game: str):
 def backtest(game, fd, ft, bd, bt):
     cfg = get_game(game)
     periods, fronts, backs = load_draws(game)
-    fc, bc = expand(fd, ft, bd, bt)
+
+    # ---- 号码范围校验 (给出可读错误, 而不是 numpy 的 IndexError) ----
+    bad_f = [v for v in list(fd) + list(ft)
+             if not (1 <= v <= cfg.front_range)]
+    bad_b = [v for v in list(bd) + list(bt)
+             if not (1 <= v <= cfg.back_range)]
+    if bad_f or bad_b:
+        raise ValueError(
+            f'号码超出 {cfg.name} 范围: '
+            f'前区需 1-{cfg.front_range}, 违规 {sorted(set(bad_f))}; '
+            f'后区需 1-{cfg.back_range}, 违规 {sorted(set(bad_b))}')
+
+    fc, bc = expand(game, fd, ft, bd, bt)
     n_t = len(fc) * len(bc)
     if n_t == 0:
         return None
