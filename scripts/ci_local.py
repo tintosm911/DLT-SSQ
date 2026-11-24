@@ -80,6 +80,8 @@ def run_checks(quick: bool = False) -> list:
               '越界号拦截 (双色球 35)'),
         Check('胆拖规则守卫', [py, 'tests/test_dan_tuo_rules.py'],
               '胆码上限 / 胆+拖下限 (大乐透前区4后区1)'),
+        Check('单式生成器', [py, 'tests/test_single_tickets.py'],
+              '号码合法 / 各注不重复 / hot 模式前区不挤'),
         Check('热号榜统计', [py, 'tests/test_hot_numbers.py'],
               '频次 / z 值 / 遗漏'),
 
