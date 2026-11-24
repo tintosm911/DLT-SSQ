@@ -155,15 +155,15 @@ def _fill_numbers(game: str, cand: Candidate,
         back_pool = list(range(1, cfg.back_range + 1))
 
     def take(pool, n, mode):
-        pool = sorted(pool)
         if mode == 'hot':
-            return pool[:n]
+            return sorted(pool)[:n]
         if mode == 'cold':
-            return pool[-n:] if n else []
+            return sorted(pool)[-n:] if n else []
         if mode == 'random':
             import random
             return sorted(random.sample(pool, n)) if n <= len(pool) else pool
-        return pool[:n]
+        # ★ 'asis' 保留**传入顺序** —— 用户按热度排的池子, 前面的号优先进胆码
+        return list(pool)[:n]
 
     fd = take(front_pool, cand.k, fill)
     ft = [x for x in take(front_pool, cand.t_f + cand.k, fill) if x not in set(fd)]

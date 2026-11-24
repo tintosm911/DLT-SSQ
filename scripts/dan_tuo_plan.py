@@ -45,10 +45,18 @@ def main():
     ap.add_argument('--back-pool', default='2 4 6 9 12')
     ap.add_argument('--budgets', default='168,500,1680,5000')
     ap.add_argument('--big-threshold', type=float, default=3000)
+    ap.add_argument('--fill', default='asis', choices=['asis', 'hot', 'cold', 'random'],
+                    help='填号策略: asis=按你给的顺序(热度序, 默认) / hot / cold / random')
     args = ap.parse_args()
 
     def nums(s):
-        return sorted(int(x) for x in s.replace(',', ' ').split())
+        # ★ 保留**输入顺序** (用户按热度排的池子, 顺序有意义 → asis 填号)
+        out = []
+        for x in s.replace(',', ' ').split():
+            v = int(x)
+            if v not in out:
+                out.append(v)
+        return out
 
     fp_raw, bp_raw = nums(args.front_pool), nums(args.back_pool)
     cfg = get_game(args.game)
@@ -70,6 +78,8 @@ def main():
               f'  ({cfg.name} 前区 1-{cfg.front_range} / 后区 1-{cfg.back_range})')
         print(f'    —— 越界号在开奖里永远不出现, 算进去只会虚增注数、'
               f'并把中奖率算高 (是错的数字)')
+    if args.fill == 'asis':
+        print('  填号顺序: 按你给的顺序 —— 排在前面的号优先进胆码位')
     print()
     print(f'  {"":4}{"预算":>8}{"目标":<14}{"结构":<26}{"注数":>7}'
           f'{"中奖率":>9}{"期望净收益":>12}')
@@ -80,7 +90,8 @@ def main():
         for goal in ('win', 'big'):
             r = optimize(args.game, budget=b, goal=goal,
                          big_threshold=args.big_threshold,
-                         front_pool=fp, back_pool=bp, top_n=1)
+                         front_pool=fp, back_pool=bp, top_n=1,
+                         fill=args.fill)
             if not r['best']:
                 continue
             best = r['best']

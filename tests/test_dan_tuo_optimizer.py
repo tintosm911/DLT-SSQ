@@ -157,6 +157,38 @@ def test_t5_edge_cases():
     assert r['best']['cost'] == r['best']['n_bets'] * cfg.ticket_price
 
 
+def test_note_6_asix_fill_puts_hottest_numbers_in_dan():
+    """
+    ★ 热度序填号 (asis): 用户按"热→冷"给号码池时, 排在前面的号应进胆码位。
+    用途: 把用户最有信心的号放到胆码 —— 胆码命中与否直接决定奖级高低。
+    ★ 但**概率不变**: 换个顺序, 中奖率必须 bit-for-bit 相同。
+    """
+    hot_first = [32, 26, 23, 18, 16, 14, 10, 6, 4, 2]
+    cold_first = list(reversed(hot_first))
+
+    r_hot = optimize('dlt', budget=168, goal='win',
+                     front_pool=hot_first, back_pool=[12, 9, 6, 4, 2],
+                     fill='asis', top_n=1)['best']
+    r_cold = optimize('dlt', budget=168, goal='win',
+                      front_pool=cold_first, back_pool=[2, 4, 6, 9, 12],
+                      fill='asis', top_n=1)['best']
+
+    # 最热的 3 个号进前区胆码, 最热的 1 个进后区胆码
+    assert r_hot['front_dan'] == [23, 26, 32]
+    assert r_hot['back_dan'] == [12]
+    assert r_hot['front_tuo'] == [2, 4, 6, 10, 14, 16, 18]
+    assert r_hot['back_tuo'] == [2, 4, 6, 9]
+
+    # 反序时: 末尾的号进胆码 (2/4/6/10/14 里最后 3 个)
+    assert r_cold['front_dan'] == [2, 4, 6]
+    assert r_cold['back_dan'] == [2]
+
+    # ★ 概率完全相同 (顺序只影响"哪几个号当胆", 不影响任何概率)
+    assert r_hot['win_rate'] == r_cold['win_rate']
+    assert r_hot['n_bets'] == r_cold['n_bets']
+    assert r_hot['expected_net'] == r_cold['expected_net']
+
+
 if __name__ == '__main__':
     fns = [v for k, v in sorted(globals().items()) if k.startswith('test_')]
     failed = 0
