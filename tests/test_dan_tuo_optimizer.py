@@ -34,10 +34,17 @@ def _brute_force(game, budget, front_pool, back_pool):
     cfg = get_game(game)
     best = None
     p_f, p_b = len(front_pool), len(back_pool)
-    for k in range(cfg.front_count + 1):
-        for t_f in range(cfg.front_count - k, p_f - k + 1):
-            for m in range(cfg.back_count + 1):
-                for t_b in range(cfg.back_count - m, p_b - m + 1):
+    # ★ v3.2.7: 与优化器同一套官方胆拖规则约束
+    for k in range(cfg.front_max_dan + 1):
+        need_f = cfg.front_count - k
+        min_t_f = (max(need_f, cfg.front_min_total_dan - k) if k >= 1
+                   else max(need_f, cfg.front_min_total_nodan))
+        for t_f in range(min_t_f, p_f - k + 1):
+            for m in range(cfg.back_max_dan + 1):
+                need_b = cfg.back_count - m
+                min_t_b = (max(need_b, cfg.back_min_total_dan - m) if m >= 1
+                           else max(need_b, cfg.back_min_total_nodan))
+                for t_b in range(min_t_b, p_b - m + 1):
                     n = comb(t_f, cfg.front_count - k) * comb(t_b, cfg.back_count - m)
                     cost = n * cfg.ticket_price
                     if cost > budget:

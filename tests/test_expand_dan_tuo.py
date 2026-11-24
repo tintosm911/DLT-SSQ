@@ -99,13 +99,14 @@ def test_note_5_plan_a_structure():
 
 def test_note_6_ssq_supported_and_range_guarded():
     cfg = get_game('ssq')
-    # 红 1 胆/5 拖 (C(5,5)=1) × 蓝 16 拖 (C(16,1)=16) = 16 注
-    fd, ft = [2], [4, 6, 10, 14, 16]
+    # ★ 双色球规则: 红球胆+拖之和必须 ≥ 7 个号码 (v3.2.7)
+    #   4 胆 + 3 拖 = 7 → C(3,2)=3 组红球组合; 蓝 C(16,1)=16 → 48 注
+    fd, ft = [2, 4, 6, 10], [14, 16, 20]
     bt = list(range(1, 17))
-    assert _check(cfg, fd, ft, [], bt) == 16
+    assert _check(cfg, fd, ft, [], bt) == 48
     tickets = expand(fd, ft, [], bt, cfg.front_count - len(fd),
                      cfg.back_count)
-    assert len(tickets) == 16
+    assert len(tickets) == 48
     for f, b in tickets:
         assert len(f) == 6 and len(set(f)) == 6
         assert len(b) == 1 and len(set(b)) == 1
@@ -114,3 +115,6 @@ def test_note_6_ssq_supported_and_range_guarded():
         _check(cfg, [2], [4, 6, 10, 14, 35], [], bt)
     with pytest.raises(SystemExit, match='超出范围'):
         _check(cfg, fd, ft, [], [1, 17])
+    # ★ 蓝球设胆码必须被拦下 (官方规则: 蓝球不设胆码)
+    with pytest.raises(SystemExit, match='超过上限'):
+        _check(cfg, fd, ft, [3], [1, 2])

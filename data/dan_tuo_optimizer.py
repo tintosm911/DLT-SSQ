@@ -105,14 +105,24 @@ def _enumerate_structures(game: str, budget: float,
     price = cfg.ticket_price
     out = []
     # 占位号码 (号码不影响概率, 只影响结构计算)
-    for k in range(0, cfg.front_count + 1):
+    for k in range(0, cfg.front_max_dan + 1):
         need_f = cfg.front_count - k
-        # ★ 拖码池最大只能是 p_f - k (拖码与胆码都在同一个池子里, 不能重叠)
-        for t_f in range(need_f, p_f - k + 1):
+        # ★ 拖码下限 (v3.2.7): 有胆码 → 胆+拖 ≥ min_total_dan;
+        #   无胆码 → 该区号码数 ≥ min_total_nodan (固定该区 或 复式该区)
+        if k >= 1:
+            min_t_f = max(need_f, cfg.front_min_total_dan - k)
+        else:
+            min_t_f = max(need_f, cfg.front_min_total_nodan)
+        # ★ 拖码与胆码都在同一个池子里, 不能重叠
+        for t_f in range(min_t_f, p_f - k + 1):
             n_f_combos = comb(t_f, need_f)
-            for m in range(0, cfg.back_count + 1):
+            for m in range(0, cfg.back_max_dan + 1):
                 need_b = cfg.back_count - m
-                for t_b in range(need_b, p_b - m + 1):
+                if m >= 1:
+                    min_t_b = max(need_b, cfg.back_min_total_dan - m)
+                else:
+                    min_t_b = max(need_b, cfg.back_min_total_nodan)
+                for t_b in range(min_t_b, p_b - m + 1):
                     n_b_combos = comb(t_b, need_b)
                     n_bets = n_f_combos * n_b_combos
                     cost = n_bets * price

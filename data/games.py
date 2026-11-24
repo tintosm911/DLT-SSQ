@@ -28,6 +28,18 @@ class GameConfig:
     front_color: str        # 前区配色（用于可视化）
     back_color: str         # 后区配色
 
+    # ★ 胆拖投注规则 (v3.2.7 加入, 依据官方游戏规则)
+    #   胆码个数上限 —— 大乐透前区 1-4 / 后区恰好 1;
+    #                    双色球红球 1-5 / 蓝球不设胆码
+    #   有胆码时, 胆+拖 的号码总数下限 ("必须多于单式投注号码个数")
+    #   无胆码时, 该区号码总数下限 (等于单式个数=固定该区; 多于=复式该区)
+    front_max_dan: int = 4
+    back_max_dan: int = 1
+    front_min_total_dan: int = 0
+    back_min_total_dan: int = 0
+    front_min_total_nodan: int = 0
+    back_min_total_nodan: int = 0
+
     @property
     def total_combinations(self) -> int:
         """总组合数"""
@@ -52,6 +64,16 @@ GAMES: Dict[str, GameConfig] = {
         ticket_price=2.0,
         front_color="#dc2626",
         back_color="#3b82f6",
+        # 大乐透游戏规则第八条:
+        #   (一) 前区胆拖: 前区选 1-4 个胆码, 胆+拖之和必须等于或多于 6 个号码
+        #   (二) 后区胆拖: 后区选 1 个胆码 + 2 个以上(含2个)拖码
+        #   (三) 双区胆拖: 前区 1-4 胆 + 后区 1 胆
+        front_max_dan=4,
+        back_max_dan=1,
+        front_min_total_dan=6,
+        back_min_total_dan=3,
+        front_min_total_nodan=5,   # 前区固定 5 个 = 该区单式 (配合另一区复式)
+        back_min_total_nodan=2,    # 后区固定 2 个 = 该区单式
     ),
     "ssq": GameConfig(
         code="ssq",
@@ -66,6 +88,15 @@ GAMES: Dict[str, GameConfig] = {
         ticket_price=2.0,
         front_color="#dc2626",
         back_color="#2563eb",
+        # 双色球游戏规则第十条 (中国福彩网 2018 第七次调整):
+        #   (一) 单式胆拖: 红球选 1-5 个胆码, 胆+拖之和必须大于等于 7 个号码
+        #   (二) 复式胆拖: 红球 1-5 胆, 蓝球选 2 个以上(蓝球不设胆码)
+        front_max_dan=5,
+        back_max_dan=0,            # ★ 蓝球不设胆码
+        front_min_total_dan=7,
+        back_min_total_dan=0,      # 不适用 (蓝球无胆码)
+        front_min_total_nodan=6,   # 红球固定 6 个 = 该区单式
+        back_min_total_nodan=1,
     ),
 }
 

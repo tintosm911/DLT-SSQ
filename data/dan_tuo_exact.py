@@ -97,6 +97,48 @@ def _reachable_hits(pool_hit: int, n_tuo: int, need: int) -> List[int]:
 # ============================================================
 # 主函数
 # ============================================================
+def check_dan_tuo_rules(game: str, front_dan, front_tuo, back_dan, back_tuo) -> list:
+    """
+    按**官方胆拖投注规则**校验一个方案, 返回问题列表 (空列表 = 合法)。
+
+    ★ v3.2.7 加入。此前工具完全不知道"胆码有上限"这件事,
+      于是会生成"大乐透前区 5 胆"这种**彩票店根本不出票**的结构。
+
+    规则依据:
+      - 大乐透游戏规则第八条 (中国体彩网):
+        前区胆拖 = 前区 1-4 个胆码, 胆+拖之和 ≥ 6 个号码
+        后区胆拖 = 后区 1 个胆码 + 2 个以上(含 2 个)拖码
+      - 双色球游戏规则第十条 (中国福彩网):
+        红球 1-5 个胆码, 胆+拖之和 ≥ 7 个号码; 蓝球不设胆码
+    """
+    cfg = get_game(game)
+    problems = []
+
+    def zone(name, dan, tuo, n, max_dan, min_total_dan, min_total_nodan):
+        k, t = len(dan), len(tuo)
+        if k > max_dan:
+            problems.append(
+                f'{name}胆码 {k} 个超过上限 {max_dan} 个 —— 彩票店出不了这种票')
+        if t < n - k:
+            problems.append(
+                f'{name}拖码不够选 (需要 {n - k} 个, 只有 {t} 个)')
+        if k >= 1:
+            if min_total_dan and k + t < min_total_dan:
+                problems.append(
+                    f'{name}胆码+拖码合计 {k + t} 个, 少于 {min_total_dan} 个 —— '
+                    f'不构成胆拖, 实质是单式')
+        else:
+            if t < min_total_nodan:
+                problems.append(
+                    f'{name}无胆码时号码数 {t} 个, 少于 {min_total_nodan} 个')
+
+    zone(cfg.front_label, front_dan, front_tuo, cfg.front_count,
+         cfg.front_max_dan, cfg.front_min_total_dan, cfg.front_min_total_nodan)
+    zone(cfg.back_label, back_dan, back_tuo, cfg.back_count,
+         cfg.back_max_dan, cfg.back_min_total_dan, cfg.back_min_total_nodan)
+    return problems
+
+
 def exact_dan_tuo(game: str,
                   front_dan: List[int], front_tuo: List[int],
                   back_dan: List[int], back_tuo: List[int]) -> dict:
@@ -135,6 +177,13 @@ def exact_dan_tuo(game: str,
             raise ValueError(
                 f'后区号码 {v} 超出范围 1-{cfg.back_range} '
                 f'({cfg.name} 后区只有 {cfg.back_range} 个号)')
+
+    # ★ 胆拖规则校验 (v3.2.7): 胆码个数上限 / 胆+拖数量下限
+    #   不校验就会生成"前 5 胆"这种根本下不了注的结构。
+    _problems = check_dan_tuo_rules(game, front_dan, front_tuo, back_dan, back_tuo)
+    if _problems:
+        raise ValueError('不符合' + cfg.name + '胆拖投注规则: '
+                         + '; '.join(_problems))
 
     need_f = cfg.front_count - len(front_dan)
     need_b = cfg.back_count - len(back_dan)

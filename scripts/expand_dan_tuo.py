@@ -74,9 +74,17 @@ def _check(cfg, front_dan, front_tuo, back_dan, back_tuo) -> int:
     if bad_b:
         raise SystemExit(f'❌ 后区号码 {sorted(set(bad_b))} 超出范围 '
                          f'1-{cfg.back_range} ({cfg.name})')
-    if len(front_dan) > cfg.front_count or len(back_dan) > cfg.back_count:
-        raise SystemExit(f'❌ 胆码个数超限 ({cfg.name} 前区最多 {cfg.front_count} 胆 / '
-                         f'后区最多 {cfg.back_count} 胆)')
+    if len(front_dan) > cfg.front_max_dan or len(back_dan) > cfg.back_max_dan:
+        raise SystemExit(
+            f'❌ 胆码个数超过上限 ({cfg.name} 前区最多 {cfg.front_max_dan} 胆 / '
+            f'后区最多 {cfg.back_max_dan} 胆; 本次前区 {len(front_dan)} 个 / '
+            f'后区 {len(back_dan)} 个) —— 彩票店出不了这种票')
+    # ★ 完整胆拖规则校验 (v3.2.7): 胆+拖数量下限等
+    from data.dan_tuo_exact import check_dan_tuo_rules
+    problems = check_dan_tuo_rules(cfg.code, front_dan, front_tuo,
+                                   back_dan, back_tuo)
+    if problems:
+        raise SystemExit('❌ ' + '; '.join(problems))
     need_f = cfg.front_count - len(front_dan)
     need_b = cfg.back_count - len(back_dan)
     if need_f > len(front_tuo) or need_b > len(back_tuo):

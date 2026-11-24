@@ -49,8 +49,11 @@ def test_t1_expected_return_matches_single_bet():
     cases = [
         ('dlt', [6], [2, 4, 10, 14, 16, 18, 23, 26, 32, 35], [4], [2, 6, 9, 12]),
         ('dlt', [], [1, 2, 3, 4, 5, 6, 7], [], list(range(1, 13))),
-        ('dlt', [1, 2, 3, 4], [5], [1], [2]),
-        ('ssq', [3], [1, 2, 4, 5, 6, 7, 8, 9, 10], [7], [1, 2, 3, 4, 5, 6, 8]),
+        # ★ v3.2.7: 以下两条按官方规则修正为合法结构
+        #   (4 胆 + 1 拖 = 5 个 → 不构成胆拖, 改为 4 胆 + 2 拖 = 6 个)
+        ('dlt', [1, 2, 3, 4], [5, 6], [1], [2, 3]),
+        #   (双色球蓝球不设胆码 → 后区改为固定 1 个蓝球)
+        ('ssq', [3], [1, 2, 4, 5, 6, 7, 8, 9, 10], [], [7]),
     ]
     for game, fd, ft, bd, bt in cases:
         cfg = get_game(game)
@@ -77,7 +80,8 @@ def test_t3_win_rate_depends_only_on_dan_count():
     定理: 固定号码池下, 中奖率只取决于胆码**个数**,
     与"胆码具体选哪几个号"完全无关 (开奖对称性)。
     """
-    for k, m in ((1, 1), (2, 0), (0, 2), (2, 1)):
+    # ★ v3.2.7: (0, 2) 后区 2 胆违反官方规则 (后区最多 1 胆) → 改为 (0, 1)
+    for k, m in ((1, 1), (2, 0), (0, 1), (2, 1)):
         sigs = set()
         for fp_iv in itertools.islice(itertools.combinations(FP, k), 0, 12):
             for bp_iv in itertools.islice(itertools.combinations(BP, m), 0, 12):
