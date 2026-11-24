@@ -75,6 +75,7 @@ def run_checks(quick: bool = False) -> list:
               'PRIZE_RULES vs judge_prize'),
         Check('胆拖精确求解器', [py, 'tests/test_dan_tuo_exact.py'], '5 个性质验证'),
         Check('胆拖结构优化器', [py, 'tests/test_dan_tuo_optimizer.py'], '5 个用例'),
+        Check('胆拖逐注展开', [py, 'tests/test_expand_dan_tuo.py'], '5 个用例'),
 
         # ---- 守门组: 数据真伪与完整性 ----
         Check('数据完整性审计', [py, 'scripts/audit_data_integrity.py'],

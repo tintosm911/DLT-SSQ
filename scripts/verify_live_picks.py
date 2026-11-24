@@ -165,6 +165,7 @@ def main():
                 'checked_at': datetime.now().isoformat(timespec='seconds'),
                 'target_period': tp,
                 'ts': rec.get('ts'),
+                'label': rec.get('label', ''),
                 'structure': rec['structure'],
                 'expected_net': rec['expected_net'],
                 'expected_win_rate': rec['win_rate'],
@@ -187,6 +188,8 @@ def main():
                 for r in new_rows:
                     print(f'  期号 {r["target_period"]} ({r["draw_date"]})  '
                           f'{r["structure"]}')
+                    if r.get('label'):
+                        print(f'    方案: {r["label"]}')
                     if r['hit']:
                         lv = ', '.join(f'{k}×{v}' for k, v in
                                        sorted(r['levels'].items(),
@@ -226,6 +229,21 @@ def main():
     exp_net = sum(r['expected_net'] for r in ledger)
     print(f'  事前预期净收益 {exp_net:+,.0f} 元  vs  实际 {ret - stake:+,.0f} 元')
     print()
+
+    # ---- 按方案标签分组 (同一期可以并存多套方案, 用来横向比) ----
+    groups = {}
+    for r in ledger:
+        groups.setdefault(r.get('label') or '(未标注)', []).append(r)
+    if groups:
+        print('  ── 按方案分组 ──')
+        for key, rows in groups.items():
+            s = sum(x['cost'] for x in rows)
+            v = sum(x['returned'] for x in rows)
+            h = sum(1 for x in rows if x['hit'])
+            roi = (v - s) / s * 100 if s else 0.0
+            print(f'    {key}: {len(rows)} 期 | 中奖 {h} 期 | '
+                  f'投入 {s:,.0f} → 返奖 {v:,.0f} 元 | ROI {roi:+.2f}%')
+        print()
     print('  ★ 样本还很小, 统计上说明不了什么 —— 但这是**唯一**能检验系统的')
     print('    "往前看"的方式, 攒够期数后才有参考价值。')
     print()

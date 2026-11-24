@@ -228,6 +228,11 @@ python scripts/dan_tuo_plan.py --front-pool "2 4 6 10 14 16 18 23 26 32 35" \
 python scripts/dantuo_live_test.py --game dlt --budget 1680 \
     --front-pool "2 4 6 10 14 16 18 23 26 32 35" --back-pool "2 4 6 9 12"
 python scripts/verify_live_picks.py --stats
+
+# ⑧ 胆拖逐注展开 — 把结构展开成 84 注清单 (核对 / 留档用)
+python scripts/expand_dan_tuo.py --front-dan "2 4 6" \
+    --front-tuo "10 14 16 18 23 26 32" --back-dan "2" --back-tuo "4 6 9 12" \
+    --out reports/方案A清单.txt
 ```
 
 ### 系统运维

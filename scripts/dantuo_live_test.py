@@ -84,6 +84,8 @@ def main():
     ap.add_argument('--front-pool', default='2 4 6 10 14 16 18 23 26 32 35')
     ap.add_argument('--back-pool', default='2 4 6 9 12')
     ap.add_argument('--no-archive', action='store_true')
+    ap.add_argument('--label', default='',
+                    help='方案标签 (写进存档, 方便开奖后对账时分辨是哪套方案)')
     args = ap.parse_args()
 
     cfg = get_game(args.game)
@@ -175,6 +177,7 @@ def main():
             'ts': datetime.now().isoformat(timespec='seconds'),
             'game': args.game,
             'target_period': next_p,
+            'label': args.label,
             'budget': args.budget,
             'structure': b['structure'],
             'n_bets': b['n_bets'],
