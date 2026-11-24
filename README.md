@@ -219,6 +219,15 @@ python scripts/dan_tuo_optimizer.py --budget 1680 --goal win \
     --front-pool "2 4 6 10 14 16 18 23 26 32 35" --back-pool "2 4 6 9 12"
 python scripts/dan_tuo_optimizer.py --budget 1000 --goal big   # 追大奖
 python scripts/dan_tuo_optimizer.py --budget 500  --goal value # 追性价比
+
+# ⑥ 胆拖方案生成器 — 给号码池, 出多档预算 × 多目标的"可照买"方案
+python scripts/dan_tuo_plan.py --front-pool "2 4 6 10 14 16 18 23 26 32 35" \
+    --back-pool "2 4 6 9 12"
+
+# ⑦ 实战闭环 — 事前存档方案, 开奖后自动对账 (唯一能往前看的方式)
+python scripts/dantuo_live_test.py --game dlt --budget 1680 \
+    --front-pool "2 4 6 10 14 16 18 23 26 32 35" --back-pool "2 4 6 9 12"
+python scripts/verify_live_picks.py --stats
 ```
 
 ### 系统运维
