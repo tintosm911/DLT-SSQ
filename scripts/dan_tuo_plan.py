@@ -50,8 +50,13 @@ def main():
     def nums(s):
         return sorted(int(x) for x in s.replace(',', ' ').split())
 
-    fp, bp = nums(args.front_pool), nums(args.back_pool)
+    fp_raw, bp_raw = nums(args.front_pool), nums(args.back_pool)
     cfg = get_game(args.game)
+    # ★ 越界号码直接剔除并提示 (两个彩种号码范围不同, 池子常被混用)
+    fp = [v for v in fp_raw if 1 <= v <= cfg.front_range]
+    bp = [v for v in bp_raw if 1 <= v <= cfg.back_range]
+    dropped_f = [v for v in fp_raw if v not in fp]
+    dropped_b = [v for v in bp_raw if v not in bp]
     budgets = [int(x) for x in args.budgets.split(',') if x.strip()]
 
     print()
@@ -60,6 +65,11 @@ def main():
     print('=' * 96)
     print(f'  前区号码池 ({len(fp)} 个): {fmt_nums(fp)}')
     print(f'  后区号码池 ({len(bp)} 个): {fmt_nums(bp)}')
+    if dropped_f or dropped_b:
+        print(f'  ⚠ 已剔除越界号码: 前区 {dropped_f or "无"} / 后区 {dropped_b or "无"}'
+              f'  ({cfg.name} 前区 1-{cfg.front_range} / 后区 1-{cfg.back_range})')
+        print(f'    —— 越界号在开奖里永远不出现, 算进去只会虚增注数、'
+              f'并把中奖率算高 (是错的数字)')
     print()
     print(f'  {"":4}{"预算":>8}{"目标":<14}{"结构":<26}{"注数":>7}'
           f'{"中奖率":>9}{"期望净收益":>12}')

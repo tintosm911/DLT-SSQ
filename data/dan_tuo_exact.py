@@ -120,6 +120,22 @@ def exact_dan_tuo(game: str,
     back_dan = sorted(set(back_dan))
     back_tuo = sorted(set(back_tuo))
 
+    # ★ 号码范围校验 (v3.2.2 修复静默 bug)
+    #   双色球红球只到 33, 大乐透的号码池若直接拿来用, 35 是**非法号**。
+    #   以前这里不校验 → 模型把 35 当成"可能开出的号" → ① 注数虚增 (含 35 的组合
+    #   是永远不会中奖的废注) ② 中奖率**虚高** (45.67% vs 真实 42.81%)。
+    #   静默给出一个"更好看但完全错误"的数字, 比报错危险得多 → 这里必须拦死。
+    for v in front_dan + front_tuo:
+        if not (1 <= v <= cfg.front_range):
+            raise ValueError(
+                f'前区号码 {v} 超出范围 1-{cfg.front_range} '
+                f'({cfg.name} 前区只有 {cfg.front_range} 个号)')
+    for v in back_dan + back_tuo:
+        if not (1 <= v <= cfg.back_range):
+            raise ValueError(
+                f'后区号码 {v} 超出范围 1-{cfg.back_range} '
+                f'({cfg.name} 后区只有 {cfg.back_range} 个号)')
+
     need_f = cfg.front_count - len(front_dan)
     need_b = cfg.back_count - len(back_dan)
     if need_f < 0 or need_b < 0:

@@ -207,6 +207,18 @@ def optimize(game: str = 'dlt',
     cfg = get_game(game)
     if goal not in GOALS:
         raise ValueError(f'未知目标 {goal}, 可选: {list(GOALS)}')
+
+    # ★ 号码池合法性校验 (v3.2.2): 号码池含非法号时不能"照算"——
+    #   双色球红球 1-33, 混入大乐透的 35 会让注数虚增、中奖率虚高。
+    #   与其在结果里给一个错的好看数字, 不如入口就报错。
+    for zone, pool, hi in (('前区', front_pool, cfg.front_range),
+                           ('后区', back_pool, cfg.back_range)):
+        if pool:
+            bad = sorted({v for v in pool if not (1 <= v <= hi)})
+            if bad:
+                raise ValueError(
+                    f'{zone}号码池含非法号码 {bad} —— {cfg.name}{zone}号码范围是 '
+                    f'1-{hi}。请先剔除越界号码 (两个彩种的号码池不能混用)。')
     threshold = big_threshold if big_threshold is not None \
         else GOAL_THRESHOLD.get(goal, 3000)
     cost_cap = max_cost if max_cost is not None else budget
