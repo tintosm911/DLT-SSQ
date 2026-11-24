@@ -92,6 +92,31 @@ def load_archive():
     return out
 
 
+def _key(rec):
+    """
+    存档与账本的配对键。
+
+    ★ v3.3.1 修复: 存档里期号是 5 位 ('26133'), 账本里是 7 位 ('2026133') —— 
+      之前直接比较字符串, 永远匹配不上 → **每跑一次就重复结算一次**,
+      战绩汇总的投入被翻倍污染。期号必须先规范化再比。
+    """
+    return (normalize_period(rec.get('target_period', ''), 'dlt'),
+            rec.get('ts'))
+
+
+def dedup_ledger(records):
+    """按 (规范化期号, ts) 去重, 保留第一条"""
+    seen = set()
+    uniq = []
+    for r in records:
+        k = _key(r)
+        if k in seen:
+            continue
+        seen.add(k)
+        uniq.append(r)
+    return uniq
+
+
 def load_ledger():
     if not LEDGER.exists():
         return []
@@ -104,7 +129,8 @@ def load_ledger():
             out.append(json.loads(line))
         except json.JSONDecodeError:
             continue
-    return out
+    # 去重 (修复历史脏数据: 同一 (期号, ts) 只保留第一条)
+    return dedup_ledger(out)
 
 
 def judge_record(rec, draw):
@@ -144,7 +170,18 @@ def main():
 
     archive = load_archive()
     ledger = load_ledger()
-    done = {(r['target_period'], r.get('ts')) for r in ledger}
+    # 账本去重后写回 (清理历史重复结算)
+    if LEDGER.exists():
+        raw = [l for l in LEDGER.read_text(encoding='utf-8').splitlines()
+               if l.strip()]
+        if len(ledger) != len(raw):
+            with LEDGER.open('w', encoding='utf-8') as f:
+                for r in ledger:
+                    f.write(json.dumps(r, ensure_ascii=False) + '\n')
+            print(f'  ⚠ 账本清理: {len(raw)} 条 → {len(ledger)} 条 '
+                  f'(删除重复结算记录)')
+            print()
+    done = {_key(r) for r in ledger}
 
     if not args.stats:
         try:
@@ -153,8 +190,7 @@ def main():
             print(f'❌ 拉官方开奖失败: {e}')
             return 1
 
-        pending = [r for r in archive
-                   if (r['target_period'], r.get('ts')) not in done]
+        pending = [r for r in archive if _key(r) not in done]
         new_rows = []
         for rec in pending:
             tp = normalize_period(rec['target_period'], 'dlt')
@@ -203,8 +239,8 @@ def main():
                           f'中奖率 {r["expected_win_rate"]:.2f}%)')
                     print()
             else:
-                pending_p = sorted({r['target_period'] for r in archive
-                                     if (r['target_period'], r.get('ts')) not in done})
+                pending_p = sorted({normalize_period(r['target_period'], 'dlt')
+                                    for r in archive if _key(r) not in done})
                 print(f'  暂无新开奖可核对 (待核对期号: '
                       f'{", ".join(pending_p) if pending_p else "无"})')
 

@@ -172,7 +172,7 @@ def main():
     if args.no_archive:
         print('     --no-archive, 跳过')
     else:
-        next_p = str(int(off[0]['period']) + 1)
+        next_p = normalize_period(str(int(off[0]['period']) + 1), 'dlt')
         rec = {
             'ts': datetime.now().isoformat(timespec='seconds'),
             'game': args.game,

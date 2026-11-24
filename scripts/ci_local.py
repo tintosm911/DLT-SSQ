@@ -82,6 +82,8 @@ def run_checks(quick: bool = False) -> list:
               '胆码上限 / 胆+拖下限 (大乐透前区4后区1)'),
         Check('单式生成器', [py, 'tests/test_single_tickets.py'],
               '号码合法 / 各注不重复 / hot 模式前区不挤'),
+        Check('实战账本配对', [py, 'tests/test_live_picks_ledger.py'],
+              '期号规范化 / 去重 / 多方案并存'),
         Check('热号榜统计', [py, 'tests/test_hot_numbers.py'],
               '频次 / z 值 / 遗漏'),
 
