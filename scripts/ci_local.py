@@ -78,6 +78,8 @@ def run_checks(quick: bool = False) -> list:
         Check('胆拖逐注展开', [py, 'tests/test_expand_dan_tuo.py'], '5 个用例'),
         Check('号码范围守卫', [py, 'tests/test_number_range_guard.py'],
               '越界号拦截 (双色球 35)'),
+        Check('热号榜统计', [py, 'tests/test_hot_numbers.py'],
+              '频次 / z 值 / 遗漏'),
 
         # ---- 守门组: 数据真伪与完整性 ----
         Check('数据完整性审计', [py, 'scripts/audit_data_integrity.py'],
