@@ -174,6 +174,10 @@ fn start_backend(app: &tauri::AppHandle) -> Result<u16, String> {
         .arg(&script)
         .arg("--port")
         .arg(port.to_string())
+        // 父进程看门狗: exe 被强制结束/崩溃时, sidecar 自己会自杀,
+        // 不留孤儿进程占着端口 (kill_on_drop 只在优雅退出时生效)
+        .arg("--watch-parent")
+        .arg(std::process::id().to_string())
         .current_dir(&root)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

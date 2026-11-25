@@ -50,6 +50,7 @@ _OPENER = urllib.request.build_opener(
 
 ARCHIVE = PROJECT_ROOT / 'data-raw' / 'live_picks.jsonl'
 LEDGER = PROJECT_ROOT / 'data-raw' / 'live_picks_ledger.jsonl'
+PURCHASED = PROJECT_ROOT / 'data-raw' / 'live_picks_purchased.jsonl'
 
 
 def _get_json(url, referer):
@@ -133,6 +134,41 @@ def load_ledger():
     return dedup_ledger(out)
 
 
+def load_purchased():
+    """读实买声明 → {(规范化期号, label), ...}
+
+    ★ 为什么单独一个文件, 不在存档里加字段:
+      data-raw/live_picks.jsonl 是**事前定死**的证据, 必须保持字节级不可变。
+      "哪几套是真掏钱买的" 是购票事实, 用独立声明文件记录, 随时可审计/修订。
+    """
+    if not PURCHASED.exists():
+        return set()
+    out = set()
+    for line in PURCHASED.read_text(encoding='utf-8').splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        period = normalize_period(str(rec.get('target_period', '')), 'dlt')
+        label = str(rec.get('label', ''))
+        if period and label:
+            out.add((period, label))
+    return out
+
+
+def split_real_paper(ledger, purchased):
+    """账本行拆成 (实买, 演练) 两组"""
+    real, paper = [], []
+    for r in ledger:
+        k = (normalize_period(str(r.get('target_period', '')), 'dlt'),
+             str(r.get('label', '')))
+        (real if k in purchased else paper).append(r)
+    return real, paper
+
+
 def judge_record(rec, draw):
     """把一个存档方案跟真实开奖对账, 返回结算结果"""
     date, af, ab = draw
@@ -160,6 +196,94 @@ def judge_record(rec, draw):
         'net': money - rec['cost'],
         'hit': money > 0,
     }
+
+
+def _fmt_levels(levels):
+    if not levels:
+        return '未中奖'
+    return ', '.join(f'{k}×{v}' for k, v in
+                     sorted(levels.items(), key=lambda x: -x[1]))
+
+
+def _prior_levels(archive, row):
+    """重算某方案的**各奖级事前概率** (至少中一注该奖级的概率, %)"""
+    period = normalize_period(str(row.get('target_period', '')), 'dlt')
+    ts = str(row.get('ts', ''))
+    rec = None
+    for a in archive:
+        if (normalize_period(str(a.get('target_period', '')), 'dlt') == period
+                and str(a.get('ts', '')) == ts):
+            rec = a
+            break
+    if not rec:
+        return []
+    try:
+        from data.dan_tuo_exact import exact_dan_tuo
+        r = exact_dan_tuo(rec.get('game', 'dlt'),
+                          front_dan=rec.get('front_dan') or [],
+                          front_tuo=rec.get('front_tuo') or [],
+                          back_dan=rec.get('back_dan') or [],
+                          back_tuo=rec.get('back_tuo') or [])
+    except Exception:
+        return []
+    out = []
+    for p in r.get('prize_dist') or []:
+        if p['label'] == '未中' or p.get('prob_any', 0) <= 0:
+            continue
+        out.append((p['label'], p['prob_any'] * 100, p['money']))
+    return out
+
+
+def _print_score(rows, title, note='', archive=None):
+    """打印一组账本行的战绩 (主成绩单 / 演练对照 共用)"""
+    if not rows:
+        return False
+    n = len(rows)
+    periods = {normalize_period(str(r.get('target_period', '')), 'dlt')
+               for r in rows}
+    hits = sum(1 for r in rows if r['hit'])
+    stake = sum(r['cost'] for r in rows)
+    ret = sum(r['returned'] for r in rows)
+    exp_win = sum(r['expected_win_rate'] for r in rows) / n
+    exp_net = sum(r['expected_net'] for r in rows)
+
+    print()
+    print('=' * 84)
+    print(f'  {title}')
+    print('=' * 84)
+    print(f'  已核对 {n} 个方案 ({len(periods)} 期开奖) | '
+          f'中奖 {hits} 个方案 ({hits / n * 100:.1f}%)')
+    print(f'  总投入 {stake:,.0f} 元 → 总返奖 {ret:,.0f} 元 → 净 {ret - stake:+,.0f} 元')
+    print(f'  实际 ROI {(ret - stake) / stake * 100:+.2f}%')
+    print(f'  事前预期中奖率 {exp_win:.2f}%  vs  实际中奖率 {hits / n * 100:.2f}%')
+    print(f'  事前预期净收益 {exp_net:+,.0f} 元  vs  实际 {ret - stake:+,.0f} 元')
+    if note:
+        print(f'  {note}')
+    print()
+
+    # ---- 逐方案: 事前预期 vs 实际 ----
+    print('  ── 逐方案 (事前预期 vs 实际) ──')
+    for r in rows:
+        label = r.get('label') or '(未标注)'
+        print(f'    ▸ {label}   {r["structure"]}')
+        print(f'      {r["n_tickets"]:,.0f} 注 / {r["cost"]:,.0f} 元'
+              f'   |   事前预期: 中奖率 {r["expected_win_rate"]:.2f}%  '
+              f'期望净 {r["expected_net"]:+.2f} 元')
+        # 各奖级: 事前概率 vs 实际命中数
+        prior = _prior_levels(archive or [], r)
+        actual = r.get('levels') or {}
+        if prior:
+            print('      各奖级 事前概率 → 实际命中:')
+            for lv, prob, money in prior:
+                got = actual.get(lv, 0)
+                print(f'        {lv:<6} {prob:>7.3f}%  (单注 {money:,.0f} 元)'
+                      f'  →  {got} 注')
+        lv = _fmt_levels(actual)
+        print(f'      实际结果: {lv}')
+        print(f'      投入 {r["cost"]:,.0f} → 返奖 {r["returned"]:,.0f} 元 → '
+              f'净 {r["net"]:+,.0f} 元  (ROI {r["net"] / r["cost"] * 100:+.2f}%)')
+        print()
+    return True
 
 
 def main():
@@ -249,37 +373,23 @@ def main():
         print('  战绩为空 (还没有已开奖的存档)')
         return 0
 
-    print()
-    print('=' * 84)
-    print('  实战战绩汇总 (事前定方案 → 开奖后核对)')
-    print('=' * 84)
-    n = len(ledger)
-    hits = sum(1 for r in ledger if r['hit'])
-    stake = sum(r['cost'] for r in ledger)
-    ret = sum(r['returned'] for r in ledger)
-    print(f'  已核对 {n} 期 | 中奖 {hits} 期 ({hits / n * 100:.1f}%)')
-    print(f'  总投入 {stake:,.0f} 元 → 总返奖 {ret:,.0f} 元 → 净 {ret - stake:+,.0f} 元')
-    print(f'  实际 ROI {(ret - stake) / stake * 100:+.2f}%')
-    exp_win = sum(r['expected_win_rate'] for r in ledger) / n
-    print(f'  事前预期中奖率 {exp_win:.2f}%  vs  实际中奖率 {hits / n * 100:.2f}%')
-    exp_net = sum(r['expected_net'] for r in ledger)
-    print(f'  事前预期净收益 {exp_net:+,.0f} 元  vs  实际 {ret - stake:+,.0f} 元')
-    print()
+    purchased = load_purchased()
+    real_rows, paper_rows = split_real_paper(ledger, purchased)
 
-    # ---- 按方案标签分组 (同一期可以并存多套方案, 用来横向比) ----
-    groups = {}
-    for r in ledger:
-        groups.setdefault(r.get('label') or '(未标注)', []).append(r)
-    if groups:
-        print('  ── 按方案分组 ──')
-        for key, rows in groups.items():
-            s = sum(x['cost'] for x in rows)
-            v = sum(x['returned'] for x in rows)
-            h = sum(1 for x in rows if x['hit'])
-            roi = (v - s) / s * 100 if s else 0.0
-            print(f'    {key}: {len(rows)} 期 | 中奖 {h} 期 | '
-                  f'投入 {s:,.0f} → 返奖 {v:,.0f} 元 | ROI {roi:+.2f}%')
-        print()
+    # 主成绩单 = 实买 (paper-only 时退回全部, 并注明)
+    if real_rows:
+        _print_score(real_rows, '实战战绩 · 实买 (真实购票)',
+                     '口径: 只统计 data-raw/live_picks_purchased.jsonl 里声明的实买方案。',
+                     archive=archive)
+        if paper_rows:
+            _print_score(paper_rows, '实战战绩 · 演练对照 (未实际购票)',
+                         '口径: 这些是方法论演练方案, 未掏钱; 注数大、样本足, '
+                         '用来对照"事前预期"是否站得住。', archive=archive)
+    else:
+        _print_score(ledger, '实战战绩 · 全部方案 (尚无实买声明)',
+                     '口径: 还没有任何方案被登记为实买, 此处统计全部存档方案。',
+                     archive=archive)
+
     print('  ★ 样本还很小, 统计上说明不了什么 —— 但这是**唯一**能检验系统的')
     print('    "往前看"的方式, 攒够期数后才有参考价值。')
     print()

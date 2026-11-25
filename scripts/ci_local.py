@@ -84,6 +84,8 @@ def run_checks(quick: bool = False) -> list:
               '号码合法 / 各注不重复 / hot 模式前区不挤'),
         Check('实战账本配对', [py, 'tests/test_live_picks_ledger.py'],
               '期号规范化 / 去重 / 多方案并存'),
+        Check('实买声明分离', [py, 'tests/test_live_picks_purchased.py'],
+              '实买 vs 演练分组 (投入口径不被污染)'),
         Check('热号榜统计', [py, 'tests/test_hot_numbers.py'],
               '频次 / z 值 / 遗漏'),
 

@@ -69,6 +69,30 @@ def git(*args) -> str:
                           encoding='utf-8', errors='replace').stdout.strip()
 
 
+def git_bytes(*args) -> bytes:
+    return subprocess.run(['git', *args], cwd=str(PROJECT_ROOT),
+                          capture_output=True).stdout
+
+
+def list_local_tree() -> List[dict]:
+    """本地 HEAD 的**全量**文件清单 (path, mode, type, blob sha)
+
+    ★ core.quotePath=false → 中文路径原样输出 (默认会把中文转义成 \\345\\220...)
+    """
+    out = git('-c', 'core.quotePath=false', 'ls-tree', '-r', 'HEAD')
+    files = []
+    for line in out.splitlines():
+        if '\t' not in line:
+            continue
+        meta, path = line.split('\t', 1)
+        parts = meta.split(' ', 2)
+        if len(parts) != 3:
+            continue
+        mode, typ, sha = parts
+        files.append({'path': path, 'mode': mode, 'type': typ, 'sha': sha})
+    return files
+
+
 def get_remote_head(token: str, owner: str, repo: str, branch: str) -> Optional[str]:
     try:
         r = _req('GET', f'{_api}/repos/{owner}/{repo}/git/ref/heads/{branch}',
@@ -205,63 +229,97 @@ def main():
         print('\n  --dry-run, 不实际上传')
         return 0
 
-    # 上传 blob (只传变更的)
-    print('\n  上传 blob...')
+    # ─────────────────────────────────────────────────────────────
+    # ★★ 重建 tree 的正确做法 (v3.3.2 修复)
+    #
+    # 旧逻辑: tree = (远端现有文件) + (本次 diff 的变更)
+    #   → **本地有、远端无、且不在本次 diff 里的文件永远补不上**。
+    #     历次 push 累积下来, 远端会停在很早的状态 (实测: 缺 29 个文件、
+    #     14 个核心文件内容还是旧版), 而 commit message 却显示最新版本。
+    #
+    # 新逻辑: tree = **本地 HEAD 的全量清单** (缺失的补传, 多余的删掉)
+    #   → 推完远端必然 == 本地 HEAD, 不依赖 --since 基线, 也不会漏历史文件。
+    # ─────────────────────────────────────────────────────────────
+    local_files = list_local_tree()
+    remote_tree_sha = (get_commit_tree(args.token, owner, repo, remote_head)
+                       if remote_head else None)
+
+    remote_map: Dict[str, str] = {}
+    if remote_tree_sha:
+        try:
+            existing = get_full_tree(args.token, owner, repo, remote_tree_sha)
+            remote_map = {e['path']: e['sha'] for e in existing}
+            print(f'\n  远端现有 {len(remote_map)} 个文件')
+        except Exception as e:
+            print(f'  [warn] 取全量 tree 失败 ({e})')
+
+    local_paths = {f['path'] for f in local_files}
+    to_upload = [f for f in local_files
+                 if remote_map.get(f['path']) != f['sha']]
+    to_delete = sorted(set(remote_map) - local_paths)
+
+    print(f'  本地 {len(local_files)} 个文件 | 远端 {len(remote_map)} 个'
+          f' | 需上传 {len(to_upload)} | 需删除 {len(to_delete)}')
+
+    # ---- 上传 blob ----
+    # ★ 用 `git cat-file blob` 取 git 内部存的**原始内容**, 而不是读磁盘文件:
+    #   这样 GitHub 侧算出的 blob sha 与本地 sha 完全一致, tree 能精确还原。
     uploaded: Dict[str, str] = {}
-    deleted: set = set()
-    for status, path in changes:
-        full = PROJECT_ROOT / path
-        if status.startswith('D') or not full.exists():
-            deleted.add(path)
-            print(f'    D {path}')
+    if to_upload:
+        print('\n  上传 blob...')
+    for f in to_upload:
+        if f['path'].startswith('.github/workflows/'):
             continue
-        data = full.read_bytes()
+        data = git_bytes('cat-file', 'blob', f['sha'])
         try:
             sha = upload_blob(args.token, owner, repo, data)
         except Exception as e:
-            print(f'    ✗ {path}: {e}')
+            print(f'    ✗ {f["path"]}: {e}')
             raise
-        uploaded[path] = sha
-        print(f'    A {path}  {len(data)/1024:.1f}KB  blob={sha[:8]}')
+        if sha != f['sha']:
+            print(f'    ! {f["path"]}: blob sha 不一致 '
+                  f'{f["sha"][:8]} → {sha[:8]}')
+        uploaded[f['path']] = sha
+        print(f'    A {f["path"]}  {len(data)/1024:.1f}KB  blob={sha[:8]}')
 
-    # 建 tree
-    # ⚠ GitHub Trees API 不支持 sha:null 删文件 (422 BadObjectState),
-    #   所以改成: 拿远端全量 blob 清单, 应用变更 (改的换 sha / 删的剔除), 整体重建
-    # ⚠ GitHub **禁止通过 API 创建 .github/workflows/ 下的文件** (防 CI 注入),
-    #   单独出现时会 404. 这些文件必须用 git push 推.
-    api_skipped = [p for p in uploaded if p.startswith('.github/workflows/')]
+    # ---- workflow: GitHub 禁止 API 写 ----
+    api_skipped = [f['path'] for f in local_files
+                   if f['path'].startswith('.github/workflows/')]
     for p in api_skipped:
-        uploaded.pop(p)
         print(f'    ⚠️ {p} 需用 git push (GitHub 禁止 API 写 workflow)')
 
-    base_tree = (get_commit_tree(args.token, owner, repo, remote_head)
-                 if remote_head else None)
-    if base_tree:
-        try:
-            existing = get_full_tree(args.token, owner, repo, base_tree)
-            print(f'\n  远端现有 {len(existing)} 个文件, 重建完整 tree...')
-        except Exception as e:
-            print(f'  [warn] 取全量 tree 失败 ({e}), 退回增量模式')
-            existing = None
-    else:
-        existing = None
+    # ---- 组装完整 tree (本地全量, 不含 workflow) ----
+    entries: List[dict] = []
+    for f in local_files:
+        if f['path'] in api_skipped:
+            continue
+        entries.append({'path': f['path'], 'mode': f['mode'], 'type': 'blob',
+                        'sha': uploaded.get(f['path'], f['sha'])})
 
-    if existing is not None:
-        entries_map = {e['path']: e for e in existing}
-        for path, sha in uploaded.items():
-            entries_map[path] = {'path': path, 'mode': '100644',
-                                 'type': 'blob', 'sha': sha}
-        for path in deleted:
-            entries_map.pop(path, None)
-        entries = list(entries_map.values())
-        print(f'  tree 请求: {len(entries)} 条, 示例: '
-              f'{[e["path"] for e in entries[:2]]}')
-        tree = create_tree(args.token, owner, repo, '', entries)
-    else:
-        # 增量模式 (无 base_tree)
-        entries = [{'path': p, 'mode': '100644', 'type': 'blob', 'sha': s}
-                   for p, s in uploaded.items()]
-        tree = create_tree(args.token, owner, repo, base_tree or '', entries)
+    # 删除远端多余的路径 (sha:null)
+    for p in to_delete:
+        entries.append({'path': p, 'mode': '100644', 'type': 'blob',
+                        'sha': None})
+
+    tree = None
+    last_err = ''
+    for attempt in range(3):
+        try:
+            tree = create_tree(args.token, owner, repo,
+                               remote_tree_sha or '', entries)
+            break
+        except Exception as e:
+            last_err = str(e)
+            print(f'  [retry {attempt + 1}] 建 tree 失败: {last_err[:120]}')
+            import time
+            time.sleep(3)
+    if tree is None:
+        # 最后再试一次: 去掉删除项 (有些情况下 sha:null 会让整棵树被拒)
+        entries = [e for e in entries if e.get('sha') is not None]
+        tree = create_tree(args.token, owner, repo, remote_tree_sha or '',
+                           entries)
+        print(f'  [warn] 已跳过删除项 (最后错误: {last_err[:100]})')
+
     print(f'\n  tree: {tree[:10]}  ({len(entries)} 条)')
 
     # 建 commit
