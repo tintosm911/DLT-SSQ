@@ -70,3 +70,36 @@ def test_note_5_archive_and_ledger_match():
     # 已经结算过的就不该再进 pending
     done = {_key(ledger)}
     assert _key(archive) in done
+
+
+def test_note_6_same_period_same_ts_different_label_kept():
+    """★ v3.3.2 实测踩到的坑
+
+    同一期**批量生成**的 A/B/C 三套方案, ts 完全相同 ('2026-11-24T16:59:11')。
+    原去重键是 (期号, ts) → B 版和 C 版被当成重复结算**静默去重掉**,
+    账本只写进 4 条, 两套方案的成绩被永久吞掉, 总投入少算 162 元。
+    → 键必须带 label。
+    """
+    out = dedup_ledger([
+        {'target_period': '2026135', 'ts': 'T1', 'label': 'A版-90元-后区6个',
+         'cost': 90.0},
+        {'target_period': '2026135', 'ts': 'T1', 'label': 'B版-72元-后区9个',
+         'cost': 72.0},
+        {'target_period': '2026135', 'ts': 'T1', 'label': 'C版-90元-后区12个',
+         'cost': 90.0},
+    ])
+    assert len(out) == 3
+    assert {r['label'] for r in out} == {
+        'A版-90元-后区6个', 'B版-72元-后区9个', 'C版-90元-后区12个'}
+    # 三套的投入必须都在 (90 + 72 + 90 = 252)
+    assert sum(r['cost'] for r in out) == 252.0
+
+
+def test_note_7_true_duplicate_still_deduped():
+    """真重复 (同期 + 同 ts + 同 label) 仍然要去掉"""
+    out = dedup_ledger([
+        {'target_period': '2026135', 'ts': 'T1', 'label': 'A版', 'cost': 90.0},
+        {'target_period': '2026135', 'ts': 'T1', 'label': 'A版', 'cost': 90.0},
+    ])
+    assert len(out) == 1
+    assert out[0]['cost'] == 90.0

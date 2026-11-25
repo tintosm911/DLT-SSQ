@@ -135,11 +135,27 @@ def get_full_tree(token: str, owner: str, repo: str,
 
 
 def upload_blob(token: str, owner: str, repo: str,
-                content: bytes) -> str:
+                content: bytes, retries: int = 4) -> str:
     enc = base64.b64encode(content).decode()
-    r = _req('POST', f'{_api}/repos/{owner}/{repo}/git/blobs', token,
-             {'content': enc, 'encoding': 'base64'})
-    return r['sha']
+    body = {'content': enc, 'encoding': 'base64'}
+    last = None
+    for attempt in range(retries):
+        try:
+            r = _req('POST', f'{_api}/repos/{owner}/{repo}/git/blobs', token, body)
+            return r['sha']
+        except Exception as e:
+            last = e
+            msg = str(e)
+            # 网络抖动 / 422 超时 → 重试; 401/403/404 → 不重试
+            if any(k in msg for k in ('401', '403', '404', 'Bad credentials',
+                                     'Resource not accessible')):
+                raise
+            wait = 3 * (attempt + 1)
+            print(f'    [retry {attempt + 1}/{retries}] blob 上传失败 '
+                  f'({msg[:90]}), {wait}s 后重试')
+            import time
+            time.sleep(wait)
+    raise last
 
 
 def create_tree(token: str, owner: str, repo: str, base_tree: str,

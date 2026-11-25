@@ -60,11 +60,11 @@ def _get_json(url, referer):
         return json.loads(r.read().decode('utf-8'))
 
 
-def official_dlt_map(n=6):
-    """体彩官方最近 n 期 → {7位期号: (date, front, back)}"""
+def _fetch_dlt(page_size):
+    """按 pageSize 拉官方最近若干期 → {7位期号: (date, front, back)}"""
     url = ('https://webapi.sporttery.cn/gateway/lottery/'
            f'getHistoryPageListV1.qry?gameNo=85&provinceId=0'
-           f'&pageSize={n}&pageNo=1&isVerify=1')
+           f'&pageSize={page_size}&pageNo=1&isVerify=1')
     j = _get_json(url, 'https://www.sporttery.cn/')
     out = {}
     for it in (j.get('value') or {}).get('list') or []:
@@ -76,6 +76,66 @@ def official_dlt_map(n=6):
         out[p] = (str(it.get('lotteryDrawTime', '')).strip(),
                   sorted(nums[:5]), sorted(nums[5:]))
     return out
+
+
+def select_fresh_map(candidates, newest):
+    """从多个 pageSize 的结果里挑一个**含最新期号**的
+
+    ★ 为什么要这个函数:
+      体彩官方 API 对**特定 pageSize 会返回过期缓存**。
+      实测 2026-11-25 26135 开奖后:
+        pageSize = 1/2/3/5/6/30/100 → 最新 2026135  ✅
+        pageSize = 8/10            → 最新 2026134  ❌ (陈旧缓存)
+      verify_live_picks.py 原本固定用 pageSize=8 → 开奖后一直"暂无新开奖可核对"。
+
+    candidates: {page_size: map}
+    newest:      已确认的最新期号 (来自 pageSize=1 这条总是新鲜的路径)
+    返回: 含 newest 的那份 map; 都过期则返回 None
+    """
+    for _, m in sorted(candidates.items()):
+        if m and newest in m:
+            return m
+    return None
+
+
+def official_dlt_map(n=6, retries=3):
+    """体彩官方最近 n 期 → {7位期号: (date, front, back)}
+
+    ⚠ 带**缓存陈旧交叉校验** (见 select_fresh_map 的说明):
+      先用 pageSize=1 确认最新期号, 再用不同 pageSize 拉历史,
+      哪个含最新期号就用哪个; 全都过期则重试。
+    """
+    import time
+    last_err = None
+    for attempt in range(retries):
+        candidates = {}
+        # pageSize=1 → 这条路径的缓存总是新鲜的, 用它确认最新期号
+        try:
+            newest_map = _fetch_dlt(1)
+            newest = max(newest_map) if newest_map else None
+        except Exception as e:
+            last_err = e
+            time.sleep(2)
+            continue
+        if not newest:
+            time.sleep(2)
+            continue
+        # 依次尝试几个 pageSize, 跳过已被证实会返回陈旧缓存的组合
+        for ps in (n, 30, 100, 6, 3, 2):
+            if ps == 1:
+                continue
+            try:
+                candidates[ps] = _fetch_dlt(ps)
+            except Exception as e:
+                last_err = e
+                continue
+            fresh = select_fresh_map(candidates, newest)
+            if fresh is not None:
+                return fresh
+        time.sleep(2)
+    if last_err:
+        raise last_err
+    return candidates.get(n) or {}
 
 
 def load_archive():
@@ -100,9 +160,16 @@ def _key(rec):
     ★ v3.3.1 修复: 存档里期号是 5 位 ('26133'), 账本里是 7 位 ('2026133') —— 
       之前直接比较字符串, 永远匹配不上 → **每跑一次就重复结算一次**,
       战绩汇总的投入被翻倍污染。期号必须先规范化再比。
+
+    ★ v3.3.2 再修复: 键里必须带 **label**。
+      原键是 (期号, ts) —— 但同一期批量生成的 A/B/C 三套方案 **ts 完全相同**
+      ('2026-11-24T16:59:11'), 于是 B 版和 C 版被当成重复结算**去重掉了**。
+      实测: 账本只写进 4 条, B/C 两套的成绩被永久吞掉, 总投入少算 162 元。
+      → 键必须是 (期号, ts, label) 三元组, label 为空时用 ''。
     """
     return (normalize_period(rec.get('target_period', ''), 'dlt'),
-            rec.get('ts'))
+            rec.get('ts'),
+            rec.get('label') or '')
 
 
 def dedup_ledger(records):

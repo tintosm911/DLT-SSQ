@@ -86,6 +86,8 @@ def run_checks(quick: bool = False) -> list:
               '期号规范化 / 去重 / 多方案并存'),
         Check('实买声明分离', [py, 'tests/test_live_picks_purchased.py'],
               '实买 vs 演练分组 (投入口径不被污染)'),
+        Check('官方API缓存守卫', [py, 'tests/test_official_api_cache.py'],
+              '特定 pageSize 返回过期缓存 (开奖后不结算)'),
         Check('热号榜统计', [py, 'tests/test_hot_numbers.py'],
               '频次 / z 值 / 遗漏'),
 
