@@ -95,22 +95,25 @@ def analyse(period, plans, draw_front=None, draw_back=None):
         plan_f[name], plan_b[name] = F, B
 
     labels = list(plans)
-    all_miss = {n: np.zeros(NF, dtype=bool) for n in labels}
     per_plan = {n: 0 for n in labels}
     joint = 0
 
     for bi in range(NB):
+        miss_list = []
         for name in labels:
             F = plan_f[name].astype(np.int16)
             B = plan_b[name][:, bi].astype(np.int16)[:, None]
             win = ((F >= 3) | ((F == 2) & (B >= 1))
                    | ((F == 1) & (B >= 2)) | ((F == 0) & (B >= 2)))
             miss = ~win.any(axis=0)
-            all_miss[name] |= miss
+            miss_list.append(miss)
             per_plan[name] += int(miss.sum())
-        j = all_miss[labels[0]].copy()
-        for n in labels[1:]:
-            j &= all_miss[n]
+        # ★ 联合: 必须是**同一个开奖号** (同一前区组合 + 同一后区组合) 下
+        #   三个方案同时全灭。旧写法用 `all_miss[name] |= miss` 跨后区组合
+        #   累积 OR, 等价于"三个方案各自挑了不同的后区组合" → 结果虚高。
+        j = miss_list[0]
+        for m in miss_list[1:]:
+            j = j & m
         joint += int(j.sum())
 
     total = NF * NB
@@ -118,6 +121,14 @@ def analyse(period, plans, draw_front=None, draw_back=None):
     indep = 1.0
     for n in labels:
         indep *= per_plan[n] / total
+
+    # ★ 自检: 联合全灭 ⊆ 每一套的单套全灭, 所以联合全灭率必须 ≤ 最小单套全灭率。
+    #   (旧实现跨后区组合累积 OR, 得出 91.17% > 27.59% —— 数学上不可能)
+    joint_pct = joint / total * 100
+    min_single = min(per_plan[n] / total * 100 for n in labels)
+    assert joint_pct <= min_single + 1e-9, (
+        f'联合全灭 {joint_pct:.4f}% > 最小单套全灭 {min_single:.4f}% '
+        f'→ 联合逻辑有 bug')
 
     # 真实开奖号在枚举中的位置
     rank = None
